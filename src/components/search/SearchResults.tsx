@@ -1,0 +1,206 @@
+
+"use client";
+
+import { useState, useEffect, useRef } from 'react';
+import { Movie } from '@/types';
+import { MovieCard } from '@/components/MovieCard';
+import { Loader2, SearchX, AlertCircle } from 'lucide-react';
+import { CONFIG } from '@/config/config';
+
+interface SearchResultsProps {
+    keyword: string;
+    activeSources: { id: string; name: string }[];
+}
+
+interface SourceStatus {
+    id: string;
+    name: string;
+    status: 'pending' | 'success' | 'error';
+    count: number;
+}
+
+export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
+    const [results, setResults] = useState<Movie[]>([]);
+    const [statuses, setStatuses] = useState<SourceStatus[]>(
+        activeSources.map(s => ({ id: s.id, name: s.name, status: 'pending', count: 0 }))
+    );
+    const [isAllFinished, setIsAllFinished] = useState(false);
+    const abortControllers = useRef<Map<string, AbortController>>(new Map());
+
+    useEffect(() => {
+        // Reset state on new keyword
+        setResults([]);
+
+        if (!keyword.trim()) {
+            setStatuses(activeSources.map(s => ({ id: s.id, name: s.name, status: 'success', count: 0 })));
+            setIsAllFinished(true);
+            return;
+        }
+
+        setStatuses(activeSources.map(s => ({ id: s.id, name: s.name, status: 'pending', count: 0 })));
+        setIsAllFinished(false);
+
+        // Cancel previous requests
+        abortControllers.current.forEach(controller => controller.abort());
+        abortControllers.current.clear();
+
+        let completedCount = 0;
+        const totalSources = activeSources.length;
+
+        // Browsers typically limit concurrent connections to the same domain (6).
+        // We limit to CONFIG.CONCURRENCY_LIMIT to avoid stalling.
+        const CONCURRENCY_LIMIT = CONFIG.CONCURRENCY_LIMIT;
+        const queue = [...activeSources];
+        let isCancelled = false;
+
+        const runNext = () => {
+            if (isCancelled || queue.length === 0) return;
+
+            const source = queue.shift();
+            if (!source) return;
+
+            const controller = new AbortController();
+            abortControllers.current.set(source.id, controller);
+
+            fetch(`/api/vod/search?source=${source.id}&wd=${encodeURIComponent(keyword)}`, {
+                signal: controller.signal
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (isCancelled) return;
+                    const list = data.list || [];
+
+                    // Update statuses
+                    setStatuses(prev => prev.map(s =>
+                        s.id === source.id ? { ...s, status: 'success', count: list.length } : s
+                    ));
+
+                    // Append unique results
+                    if (list.length > 0) {
+                        // Use transition to prioritize UI responsiveness
+                        // This prevents typing lag or scroll stutter during rapid updates
+                        import('react').then(({ startTransition }) => {
+                            startTransition(() => {
+                                setResults(prev => {
+                                    const newItems: Movie[] = [];
+                                    // Use source_id in key if deduplication is disabled
+                                    const getKey = (m: Movie) => {
+                                        const base = `${m.vod_name}-${m.vod_year || ''}`.toLowerCase().trim();
+                                        return CONFIG.SEARCH_DEDUPLICATE ? base : `${base}-${m.source_id}`;
+                                    };
+
+                                    const seen = new Set(prev.map(m => getKey(m)));
+
+                                    list.forEach((item: Movie) => {
+                                        const key = getKey(item);
+                                        if (!seen.has(key)) {
+                                            seen.add(key);
+                                            newItems.push(item);
+                                        }
+                                    });
+
+                                    return [...prev, ...newItems];
+                                });
+                            });
+                        });
+                    }
+                })
+                .catch(err => {
+                    if (err.name !== 'AbortError' && !isCancelled) {
+                        setStatuses(prev => prev.map(s =>
+                            s.id === source.id ? { ...s, status: 'error', count: 0 } : s
+                        ));
+                    }
+                })
+                .finally(() => {
+                    if (isCancelled) return;
+                    completedCount++;
+                    if (completedCount === totalSources) {
+                        setIsAllFinished(true);
+                    } else {
+                        // Try to trigger the next one in queue
+                        runNext();
+                    }
+                });
+        };
+
+        // Start initial batch
+        for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, totalSources); i++) {
+            runNext();
+        }
+
+        return () => {
+            isCancelled = true;
+            abortControllers.current.forEach(controller => controller.abort());
+        };
+    }, [keyword, activeSources]);
+
+
+    // 进阶优化 1: Top 1 结果"强力静默预载"
+    // 当第一条搜索结果出现时，系统提前去后台把它的详情数据（包括第一集地址）拉取到 Edge Cache 中。
+    const hasPrefetchedTopResult = useRef<string | null>(null);
+    useEffect(() => {
+        if (results.length > 0 && results[0] && hasPrefetchedTopResult.current !== keyword) {
+            hasPrefetchedTopResult.current = keyword;
+            const topResult = results[0];
+            if (topResult.source_id && topResult.vod_id) {
+                // 用最低优先级静默抓取
+                fetch(`/api/vod/latest?source=${encodeURIComponent(topResult.source_id)}&id=${encodeURIComponent(topResult.vod_id)}`, {
+                    priority: 'low',
+                    cache: 'force-cache'
+                }).catch(() => { });
+            }
+        }
+    }, [results, keyword]);
+
+
+    const pendingCount = statuses.filter(s => s.status === 'pending').length;
+    const hasResults = results.length > 0;
+
+    return (
+        <div>
+            {/* Status Bar */}
+            <div className="mb-6 flex flex-wrap gap-2 text-xs">
+                {statuses.map(s => (
+                    <div key={s.id} className={`px-2 py-1 rounded-full border flex items-center gap-1.5 transition-all ${s.status === 'pending' ? 'bg-slate-900 border-indigo-500/50 text-indigo-300 animate-pulse' :
+                        s.status === 'error' ? 'bg-red-950/30 border-red-500/20 text-red-400' :
+                            s.count > 0 ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-400' :
+                                'bg-slate-900 border-slate-700 text-slate-500'
+                        }`}>
+                        {s.status === 'pending' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {s.status === 'error' && <AlertCircle className="w-3 h-3" />}
+                        <span>{s.name}</span>
+                        {s.status === 'success' && <span className="opacity-70">({s.count})</span>}
+                    </div>
+                ))}
+            </div>
+
+            {/* Results Grid */}
+            {hasResults && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 mb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {results.map((movie, idx) => (
+                        <MovieCard key={`${movie.vod_id}-${idx}`} movie={movie} />
+                    ))}
+                </div>
+            )}
+
+            {/* Empty State / Loading State */}
+            {!hasResults && !isAllFinished && (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+                    <p className="text-slate-400 animate-pulse">正在全网搜索 {pendingCount} 个资源库...</p>
+                </div>
+            )}
+
+            {!hasResults && isAllFinished && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                    <div className="bg-slate-900 rounded-full p-6 mb-4">
+                        <SearchX className="w-12 h-12 opacity-50" />
+                    </div>
+                    <p className="text-lg font-medium">未找到相关资源</p>
+                    <p className="text-sm">请尝试更换关键词搜索</p>
+                </div>
+            )}
+        </div>
+    );
+}

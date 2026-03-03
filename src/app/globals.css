@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617;
+  --foreground: #f8fafc;
+}
+
+@theme {
+  --color-slate-950: #020617;
+  --color-slate-900: #0f172a;
+  --color-slate-800: #1e293b;
+  --color-slate-700: #334155;
+  --color-slate-400: #94a3b8;
+  --color-slate-100: #f1f5f9;
+
+  --color-indigo-500: #6366f1;
+  --color-indigo-400: #818cf8;
+  /* Add others if needed, but Tailwind 4 includes standard palette usually if we don't override too much. 
+     Actually, standard palette IS included. I don't need to redefine unless I want custom vars.
+  */
+}
+
+/* 
+  In v4, standard colors are available. 
+  Let's just keep the layers.
+*/
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500/30;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-xl;
+  }
+
+  .glass-card {
+    @apply bg-slate-900/40 backdrop-blur-md border border-slate-800/60 hover:border-indigo-500/30 hover:bg-slate-800/60 transition-all duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400;
+  }
+
+  /* Safe area support for mobile devices with notches */
+  .top-safe {
+    top: max(1rem, env(safe-area-inset-top));
+  }
+}
