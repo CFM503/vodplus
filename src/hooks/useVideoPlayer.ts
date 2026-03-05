@@ -22,6 +22,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     const lastSeekEndTimeRef = useRef(0); // For click suppression
     const hasSkippedIntroRef = useRef(false);
     const hasPrefetchedNextRef = useRef(false);
+    const skipIntroTimeRef = useRef(0); // Ref 镜像，解决 timeupdate 闭包捕获陈旧值问题
 
     // State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -52,7 +53,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         value: '',
         visible: false
     });
-    const [skipIntroTime, setSkipIntroTime] = useState(0);
+    // skipIntroTime 完全使用 Ref，不作为 state，避免修改时触发重渲染和 Effect 链
 
     const touchStartRef = useRef<{ x: number, y: number, time: number, vol: number, brightness: number, currentTime: number } | null>(null);
     const gestureTypeRef = useRef<'none' | 'vertical-left' | 'vertical-right' | 'horizontal'>('none');
@@ -125,13 +126,13 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         setIsHovering(true);
     }, []);
 
-    const handleSkipIntroChange = (seconds: number) => {
+    const handleSkipIntroChange = useCallback((seconds: number) => {
         const next = Math.max(0, seconds);
-        setSkipIntroTime(next);
+        skipIntroTimeRef.current = next;
         if (typeof window !== 'undefined') {
             sessionStorage.setItem('VOD_SESSION_SKIP_INTRO', next.toString());
         }
-    };
+    }, []);
 
     // Initialization Effect (HLS)
     useEffect(() => {
@@ -147,7 +148,9 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         // Load skip intro time from session storage
         if (typeof window !== 'undefined') {
             const saved = sessionStorage.getItem('VOD_SESSION_SKIP_INTRO');
-            if (saved) setSkipIntroTime(parseInt(saved, 10));
+            if (saved) {
+                skipIntroTimeRef.current = parseInt(saved, 10);
+            }
         }
 
         const video = videoRef.current;
@@ -308,15 +311,23 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     }, [autoplay, isLoading]);
 
     // Skip Intro Logic
+    // 仅在视频加载完成时执行一次跳片头，不依赖 skipIntroTime state
+    // 播放中修改跳过时间只更新 ref，下次视频加载时自动生效
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || isLoading || hasSkippedIntroRef.current || skipIntroTime <= 0) return;
+        if (!video || isLoading || hasSkippedIntroRef.current) return;
+
+        const target = skipIntroTimeRef.current;
+        if (target <= 0) {
+            hasSkippedIntroRef.current = true; // 标记为已处理，防止后续触发
+            return;
+        }
 
         const doSkip = () => {
             if (hasSkippedIntroRef.current) return;
             hasSkippedIntroRef.current = true;
-            video.currentTime = skipIntroTime;
-            showToast(`已为您跳过片头 ${skipIntroTime}s`);
+            video.currentTime = target;
+            showToast(`已为您跳过片头 ${target}s`);
         };
 
         if (video.readyState >= 1) {
@@ -329,7 +340,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             video.addEventListener('loadedmetadata', onLoadedMetadata);
             return () => video.removeEventListener('loadedmetadata', onLoadedMetadata);
         }
-    }, [isLoading, skipIntroTime, showToast]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading, showToast]);
 
     // Progress Bar Rect Cache
     useEffect(() => {
@@ -370,15 +382,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                 const currentProgressPercent = (video.currentTime / video.duration) * 100;
                 setProgress(currentProgressPercent);
                 updateBuffered();
-
-                // Intro skip logic
-                if (skipIntroTime > 0 && !hasSkippedIntroRef.current && video.currentTime > 0) {
-                    if (video.currentTime < skipIntroTime) {
-                        video.currentTime = skipIntroTime;
-                        hasSkippedIntroRef.current = true;
-                        showToast(`自动跳过片头 ${skipIntroTime}s`);
-                    }
-                }
 
                 // Next Episode implicit preload logic (at 80% progress)
                 if (nextEpisodeUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 80) {
@@ -881,7 +884,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         gestureHUD,
         toast,
         levels,
-        skipIntroTime,
+        skipIntroTime: skipIntroTimeRef,
         handleSkipIntroChange,
         currentLevel,
         activeLevelIdx,

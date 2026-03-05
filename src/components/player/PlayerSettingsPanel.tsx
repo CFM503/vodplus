@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Settings, Gauge, ZoomIn, X, FastForward, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -27,6 +27,16 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
         skipIntroTime,
         handleSkipIntroChange,
     } = player;
+
+    // 本地 state 管理跳过片头秒数的显示，从 Ref 初始化
+    // 这样修改跳过时间不会触发 useVideoPlayer 的重渲染
+    const [localSkipTime, setLocalSkipTime] = useState(() => skipIntroTime.current);
+
+    const onSkipChange = (delta: number) => {
+        const next = Math.max(0, localSkipTime + delta);
+        setLocalSkipTime(next);
+        handleSkipIntroChange(next);
+    };
 
     return (
         <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left", className)}>
@@ -159,24 +169,24 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                     </div>
                     <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-1 border border-white/5">
                         <button
-                            onClick={() => handleSkipIntroChange(skipIntroTime - 10)}
+                            onClick={() => onSkipChange(-10)}
                             className="p-1 hover:bg-white/10 rounded transition-colors text-slate-400 hover:text-white"
-                            disabled={skipIntroTime <= 0}
+                            disabled={localSkipTime <= 0}
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
                         <span className="text-xs font-mono text-white min-w-[32px] text-center">
-                            {skipIntroTime}s
+                            {localSkipTime}s
                         </span>
                         <button
-                            onClick={() => handleSkipIntroChange(skipIntroTime + 10)}
+                            onClick={() => onSkipChange(10)}
                             className="p-1 hover:bg-white/10 rounded transition-colors text-slate-400 hover:text-white"
                         >
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
-                <p className="mt-2 text-[10px] text-slate-500 italic">设置后下个视频生效，关闭浏览器后重置</p>
+                <p className="mt-2 text-[10px] text-slate-500 italic">下次播放生效，关闭浏览器后重置</p>
             </div>
         </div>
     );
