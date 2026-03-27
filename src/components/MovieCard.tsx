@@ -16,11 +16,10 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
 
     // Determine link
     // Ensure href is never empty or just #
-    const safeHref = movie.source_id && movie.vod_id
-        ? `/movie/${movie.source_id}/${movie.vod_id}`
-        : `/search?q=${encodeURIComponent(movie.vod_name)}`;
-
     const isDiscoverySrc = movie.source_id === 'tmdb';
+    const safeHref = movie.source_id && movie.vod_id
+        ? `/movie/${movie.source_id}/${movie.vod_id}${isDiscoverySrc ? `?name=${encodeURIComponent(movie.vod_name)}` : ''}`
+        : `/search?q=${encodeURIComponent(movie.vod_name)}`;
 
     const [imgSrc, setImgSrc] = useState(movie.vod_pic);
     const hasPrefetchedRef = useRef(false);

@@ -2,7 +2,7 @@
 import { cachedGetMovieDetail } from '@/lib/api';
 import VideoPlayer from '@/components/VideoPlayer';
 import { Header } from '@/components/Header';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Calendar, Globe, User } from 'lucide-react';
 import { RESOURCE_SITES } from '@/lib/resources';
 import { cookies } from 'next/headers';
@@ -19,6 +19,7 @@ interface PageProps {
         sourceId: string;
         id: string;
     }>;
+    searchParams: Promise<{ name?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -62,14 +63,18 @@ export async function generateMetadata({ params }: PageProps) {
     };
 }
 
-export default async function MovieDetail({ params }: PageProps) {
+export default async function MovieDetail({ params, searchParams }: PageProps) {
     const { sourceId, id } = await params;
+    const { name } = await searchParams || {};
     const cookieStore = await cookies();
     const { disabledSources } = await getUserPreferences(cookieStore);
 
     const movie = await cachedGetMovieDetail(sourceId, id, disabledSources);
 
     if (!movie) {
+        if (name) {
+            redirect(`/search?q=${encodeURIComponent(name)}`);
+        }
         notFound();
     }
 
