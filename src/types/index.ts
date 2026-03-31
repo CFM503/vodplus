@@ -24,3 +24,8 @@ export interface ApiResponse {
     total: number | string;
     list: Movie[];
 }
+
+export interface Episode {
+    name: string;
+    url: string;
+}

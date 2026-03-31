@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getCookie, setCookie } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface Settings {
     disabledSources: string[];
@@ -23,8 +24,8 @@ export function useSettings(isOpen: boolean) {
                 try {
                     const parsed = JSON.parse(savedDisabled);
                     if (Array.isArray(parsed)) setDisabledSources(parsed);
-                } catch (e) {
-                    console.error('Failed to parse disabled sources', e);
+                } catch (e: unknown) {
+                    logger.error('Settings', 'Failed to parse disabled sources', e);
                 }
             }
 
@@ -53,8 +54,8 @@ export function useSettings(isOpen: boolean) {
             setCookie('VOD_TV_SOURCE', tvSource);
             setCookie('VOD_CUSTOM_LOCAL_URL', customLocalUrl);
             return true;
-        } catch (e) {
-            console.error('Failed to save settings:', e);
+        } catch (e: unknown) {
+            logger.error('Settings', 'Failed to save settings:', e);
             return false;
         }
     };

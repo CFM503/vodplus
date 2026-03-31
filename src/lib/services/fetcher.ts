@@ -2,8 +2,9 @@ import { fetchWithTimeout } from '../utils';
 import { ApiResponse } from '@/types';
 import { ResourceSite } from '../resources';
 import { CONFIG } from '@/config/config';
+import { logger } from '../logger';
 
-export async function fetchRawFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<any> {
+export async function fetchRawFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<unknown> {
     const url = `${source.baseUrl}${params}`;
 
     // noStore=true for real-time search (always fresh); false for home/detail pages (cacheable)
@@ -17,13 +18,13 @@ export async function fetchRawFromSource(source: ResourceSite, params: string = 
 
         // Only support JSON responses for Edge Runtime compatibility
         if (!text.trim().startsWith('{')) {
-            console.warn(`Non-JSON response from ${source.name}, skipping`);
-            return null;
+            logger.warn('Fetcher', `Non-JSON response from ${source.name}, skipping`);
+            return undefined;
         }
 
         return JSON.parse(text);
-    } catch (error) {
-        console.error(`Error fetching from ${source.name}:`, error);
+    } catch (error: unknown) {
+        logger.error('Fetcher', `Error fetching from ${source.name}:`, error);
         throw error;
     }
 }

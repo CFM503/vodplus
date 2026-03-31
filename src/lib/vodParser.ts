@@ -1,7 +1,4 @@
-interface Episode {
-    name: string;
-    url: string;
-}
+import { Episode } from '@/types';
 
 export function parseVodPlayUrl(url: string | undefined | null): Episode[] {
     if (!url) return [];

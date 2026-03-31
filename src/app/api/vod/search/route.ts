@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchFromSource } from '@/lib/services/vodService';
 import { getMetadataProvider } from '@/lib/metadata';
 import { RESOURCE_SITES } from '@/lib/resources';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ list });
     } catch (error) {
-        console.error(`Search API Error (${sourceId}):`, error);
+        logger.error('SearchAPI', `Error (${sourceId}):`, error);
         return NextResponse.json({ list: [] });
     }
 }

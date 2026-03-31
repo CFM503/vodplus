@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Movie, ApiResponse } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface LibraryState {
     list: Movie[];
@@ -45,7 +46,7 @@ export function useLibrary(
                         isLoading: false,
                     });
                 } catch (error) {
-                    console.error('Library fetch error:', error);
+                    logger.error('Library', 'fetch error:', error);
                     setState(prev => ({ ...prev, isLoading: false }));
                 }
             };

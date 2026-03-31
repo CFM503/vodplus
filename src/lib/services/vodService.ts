@@ -8,6 +8,7 @@ import { normalizeVodResponse } from './normalizer';
 import { CONFIG } from '@/config/config';
 import { withErrorHandling } from './errorHandler';
 import { unstable_cache } from 'next/cache';
+import { logger } from '../logger';
 
 export async function fetchFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<ApiResponse> {
     const startTime = Date.now();
@@ -16,7 +17,7 @@ export async function fetchFromSource(source: ResourceSite, params: string = '',
         const duration = Date.now() - startTime;
         return normalizeVodResponse(data, source, duration);
     } catch (error) {
-        console.error(`Error fetching from ${source.name}:`, error);
+        logger.error('FetchFromSource', `Error fetching from ${source.name}:`, error);
         return { code: 500, msg: 'Error', page: 1, pagecount: 0, limit: 0, total: 0, list: [] };
     }
 }
@@ -41,7 +42,7 @@ export async function getRecentMovies(sourceId: string = 'feifan', page: number 
                 };
             }
         } catch (e) {
-            console.warn('TMDB getDiscover failed, falling back to native source', e);
+            logger.warn('vodService', 'TMDB getDiscover failed, falling back to native source', e);
         }
 
         // Auto-fallback to native source if TMDB failed or returned empty
@@ -138,7 +139,7 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                 }
             }
         } catch (e) {
-            console.error('Error in Match & Play:', e);
+            logger.error('vodService', 'Match & Play Error:', e);
         }
         return null;
     }
@@ -204,7 +205,7 @@ async function fetchMixedCategory(typeId: number, page: number = 1, limit: numbe
             const res = await fetchFromSource(customSource, `?ac=detail&pg=${page}&t=${typeId}`);
             return res.list.slice(0, limit);
         } catch (e) {
-            console.error('Custom local source fetch failed', e);
+            logger.error('vodService', 'Custom local source fetch failed', e);
             return [];
         }
     }
@@ -242,7 +243,7 @@ async function fetchMixedCategory(typeId: number, page: number = 1, limit: numbe
 
         return mixed.slice(0, limit);
     } catch (e) {
-        console.error(`Error fetching category ${typeId}`, e);
+        logger.error('vodService', `Error fetching category ${typeId}`, e);
         return [];
     }
 }

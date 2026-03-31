@@ -1,4 +1,5 @@
 import { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
+import { logger } from './logger';
 
 interface UserPreferences {
     disabledSources: string[];
@@ -14,8 +15,8 @@ export async function getUserPreferences(cookieStore: ReadonlyRequestCookies): P
     if (disabledCookie) {
         try {
             disabledSources = JSON.parse(disabledCookie);
-        } catch (e) {
-            console.error('Failed to parse disabled sources cookie', e);
+        } catch (e: unknown) {
+            logger.error('Preferences', 'Failed to parse disabled sources cookie', e);
         }
     }
 

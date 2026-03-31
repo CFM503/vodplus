@@ -1,11 +1,12 @@
 
 import { Movie } from '@/types';
 import { getThemedPlaceholder, fetchWithTimeout } from './utils';
+import { logger } from './logger';
 
 import { SERVER_CONFIG } from '@/config/server';
 
-const TMDB_API_KEY = SERVER_CONFIG.TMDB.API_KEY;
-const TMDB_BASE_URL = SERVER_CONFIG.TMDB.BASE_URL;
+export const TMDB_API_KEY = SERVER_CONFIG.TMDB.API_KEY;
+export const TMDB_BASE_URL = SERVER_CONFIG.TMDB.BASE_URL;
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 
 interface TmdbItem {
@@ -51,9 +52,9 @@ export async function getTmdbTrending(type: 'movie' | 'tv' = 'movie'): Promise<M
 
         const data = await res.json();
         return (data.results || []).map((item: TmdbItem) => normalizeTmdbToMovie(item, type));
-    } catch (error: any) {
-        if (error.name !== 'AbortError') {
-            console.warn(`Error fetching TMDB trending (${type}): ${error.message || String(error)}`);
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+            logger.warn('TMDB', `Error fetching trending (${type}):`, error);
         }
         return [];
     }
@@ -74,9 +75,9 @@ export async function getTmdbPopular(type: 'movie' | 'tv' = 'movie'): Promise<Mo
 
         const data = await res.json();
         return (data.results || []).map((item: TmdbItem) => normalizeTmdbToMovie(item, type));
-    } catch (error: any) {
-        if (error.name !== 'AbortError') {
-            console.warn(`Error fetching TMDB popular (${type}): ${error.message || String(error)}`);
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+            logger.warn('TMDB', `Error fetching popular (${type}):`, error);
         }
         return [];
     }
@@ -97,9 +98,9 @@ export async function getTmdbDiscover(type: 'movie' | 'tv' = 'movie', page: numb
 
         const data = await res.json();
         return (data.results || []).map((item: TmdbItem) => normalizeTmdbToMovie(item, type));
-    } catch (error: any) {
-        if (error.name !== 'AbortError') {
-            console.warn(`Error discovering TMDB (${type}) page ${page}: ${error.message || String(error)}`);
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+            logger.warn('TMDB', `Error discovering (${type}) page ${page}:`, error);
         }
         return [];
     }

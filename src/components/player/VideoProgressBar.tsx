@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { CONFIG } from '@/config/config';
+import { logger } from '@/lib/logger';
 
 type PlayerState = ReturnType<typeof useVideoPlayer>;
 
@@ -155,7 +156,7 @@ export default function VideoProgressBar({ player, url, variant, className }: Vi
                     previewVideoRef.current.src = url;
                 }
             } catch (e) {
-                console.error("HLS init for preview failed", e);
+                logger.error('VideoProgressBar', 'HLS init for preview failed', e);
             }
         };
 

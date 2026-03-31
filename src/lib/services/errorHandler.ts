@@ -1,3 +1,5 @@
+import { logger } from '../logger';
+
 /**
  * Unified error handling middleware for API services
  * Provides consistent error logging and fallback values
@@ -35,7 +37,7 @@ export async function withErrorHandling<T>(
         // Log error with context unless silent
         if (!silent) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[${context}] Error:`, errorMessage);
+            logger.error(context, errorMessage);
 
             // Future: Add error reporting here
             // reportToSentry(error, context);

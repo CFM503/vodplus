@@ -1,11 +1,7 @@
 import { Movie } from '@/types';
 import { MetadataProvider } from './interface';
-import { getTmdbTrending, getTmdbPopular, getTmdbDiscover } from '../tmdb';
-
-import { SERVER_CONFIG } from '@/config/server';
-
-const TMDB_API_KEY = SERVER_CONFIG.TMDB.API_KEY;
-const TMDB_BASE_URL = SERVER_CONFIG.TMDB.BASE_URL;
+import { getTmdbTrending, getTmdbPopular, getTmdbDiscover, TMDB_API_KEY, TMDB_BASE_URL } from '../tmdb';
+import { logger } from '../logger';
 
 export class TmdbMetadataProvider implements MetadataProvider {
     id = 'tmdb';
@@ -17,8 +13,8 @@ export class TmdbMetadataProvider implements MetadataProvider {
     async getTrending(type: 'movie' | 'tv') {
         try {
             return await getTmdbTrending(type);
-        } catch (e: any) {
-            console.warn(`TMDB getTrending(${type}) failed: ${e.message || String(e)}`);
+        } catch (e: unknown) {
+            logger.warn('TMDB', `getTrending(${type}) failed:`, e);
             return [];
         }
     }
@@ -26,8 +22,8 @@ export class TmdbMetadataProvider implements MetadataProvider {
     async getPopular(type: 'movie' | 'tv') {
         try {
             return await getTmdbPopular(type);
-        } catch (e: any) {
-            console.warn(`TMDB getPopular(${type}) failed: ${e.message || String(e)}`);
+        } catch (e: unknown) {
+            logger.warn('TMDB', `getPopular(${type}) failed:`, e);
             return [];
         }
     }
@@ -35,8 +31,8 @@ export class TmdbMetadataProvider implements MetadataProvider {
     async getDiscover(type: 'movie' | 'tv', page: number) {
         try {
             return await getTmdbDiscover(type, page);
-        } catch (e: any) {
-            console.warn(`TMDB getDiscover(${type}) failed: ${e.message || String(e)}`);
+        } catch (e: unknown) {
+            logger.warn('TMDB', `getDiscover(${type}) failed:`, e);
             return [];
         }
     }
@@ -72,11 +68,11 @@ export class TmdbMetadataProvider implements MetadataProvider {
                 }
             } catch (fetchError) {
                 clearTimeout(timeoutId);
-                console.warn('TMDB Network Error:', fetchError);
+                logger.warn('TMDB', 'Network Error:', fetchError);
                 return null;
             }
         } catch (e) {
-            console.error('TMDB Detail fetch failed:', e);
+            logger.error('TMDB', 'Detail fetch failed:', e);
         }
         return null;
     }

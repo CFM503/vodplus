@@ -7,6 +7,7 @@ import { getUserPreferences } from '@/lib/preferences';
 import { Suspense } from 'react';
 import { MovieList } from '@/components/latest/MovieList';
 import { HomeSkeleton } from '@/components/home/HomeSkeleton';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'edge';
 export const revalidate = 60; // Cache for 60 seconds
@@ -99,7 +100,7 @@ export default async function LatestPage({ searchParams }: PageProps) {
 // Wrapper to handle server-side data fetching for TMDB
 import { getRecentMovies } from '@/lib/services/vodService';
 
-async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources, customLocalUrl }: any) {
+async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources, customLocalUrl }: { sourceId: string; pageNum: number; mediaType: 'movie' | 'tv'; disabledSources: string[]; customLocalUrl: string }) {
     let initialData = null;
 
     // Server-side fetch ONLY for TMDB to support region proxies
@@ -107,7 +108,7 @@ async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources,
         try {
             initialData = await getRecentMovies(sourceId, pageNum, mediaType, disabledSources, customLocalUrl);
         } catch (e) {
-            console.error("SSR Fetch Error for TMDB:", e);
+            logger.error('LatestPage', 'SSR Fetch Error for TMDB:', e);
         }
     }
 

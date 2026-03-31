@@ -4,11 +4,7 @@ import { useState } from 'react';
 import VideoPlayer from '@/components/VideoPlayer';
 import { cn } from '@/lib/utils';
 import { PlayCircle } from 'lucide-react';
-
-interface Episode {
-    name: string;
-    url: string;
-}
+import { Episode } from '@/types';
 
 export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Episode[], poster: string }) {
     const [currentEpIndex, setCurrentEpIndex] = useState(0);

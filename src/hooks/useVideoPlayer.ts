@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
+import { logger } from '@/lib/logger';
 
 interface VideoPlayerProps {
     url: string;
@@ -14,7 +16,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     const containerRef = useRef<HTMLDivElement>(null);
     const progressBarRef = useRef<HTMLDivElement>(null);
     const progressRectRef = useRef<DOMRect | null>(null);
-    const hlsRef = useRef<any>(null);
+    const hlsRef = useRef<InstanceType<typeof Hls> | null>(null);
     const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastTapRef = useRef(0);
     const lastMousePosRef = useRef({ x: 0, y: 0 });
@@ -78,8 +80,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             const playPromise = video.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
-                    if (error.name !== 'AbortError') {
-                        console.error('Play interrupted', error);
+                    if (error instanceof Error && error.name !== 'AbortError') {
+                        logger.error('VideoPlayer', 'Play interrupted', error);
                     }
                 });
             }
@@ -160,7 +162,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             if (!url) return;
             if (url.includes('.mp4') || url.includes('.webm')) {
                 video.src = url;
-                video.src = url;
                 setIsLoading(false);
                 // Autoplay handled by useEffect
                 return;
@@ -175,7 +176,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
-                        startLevel: -1,   // -1 = 自动根据带宽选择起播画质 (推荐)
+                        startLevel: -1,
                         enableWorker: true,
                         maxBufferLength: maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
@@ -187,7 +188,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                         levelLoadingMaxRetry: 4,
                         fragLoadingTimeOut: 20000,
                         fragLoadingMaxRetry: 6,
-                        xhrSetup: function (xhr, url) {
+                        xhrSetup: function (xhr: XMLHttpRequest, _url: string) {
                             xhr.withCredentials = false;
                         },
                     });
@@ -195,21 +196,21 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
 
                     hls.loadSource(url.trim());
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        const availableLevels = hls.levels.map((l: any, idx: number) => ({
+                        const availableLevels = hls.levels.map((l: { height: number }, idx: number) => ({
                             height: l.height,
                             index: idx
-                        })).sort((a: any, b: any) => b.height - a.height);
+                        })).sort((a, b) => b.height - a.height);
                         setLevels(availableLevels);
                         setIsLoading(false);
                     });
 
-                    hls.on(Hls.Events.LEVEL_SWITCHED, (_: any, data: any) => {
+                    hls.on(Hls.Events.LEVEL_SWITCHED, (_: unknown, data: { level: number }) => {
                         setActiveLevelIdx(data.level);
                     });
 
                     hls.attachMedia(video);
 
-                    hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+                    hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string }) => {
                         if (!data.fatal) return;
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -230,8 +231,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                         // Autoplay handled by useEffect
                     }, { once: true });
                 }
-            } catch (error) {
-                console.error('Failed to load Hls.js', error);
+            } catch (error: unknown) {
+                logger.error('VideoPlayer', 'Failed to load Hls.js', error);
                 if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = url;
                     video.addEventListener('loadedmetadata', () => {
@@ -293,7 +294,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                     if (error.name === 'AbortError') return; // Ignore intentional aborts
 
                     // Squelch the error, it's expected on some browsers without interaction
-                    console.warn('[Autoplay] Unmuted autoplay failed, switching to muted.', error.message);
+                    logger.warn('VideoPlayer', 'Unmuted autoplay failed, switching to muted.', error instanceof Error ? error.message : String(error));
 
                     if (videoRef.current) {
                         videoRef.current.muted = true;
@@ -301,7 +302,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                         const mutedPromise = videoRef.current.play();
                         if (mutedPromise !== undefined) {
                             mutedPromise.catch(e => {
-                                if (e.name !== 'AbortError') console.warn('[Autoplay] Muted autoplay also failed.', e);
+                                if (!(e instanceof Error) || e.name !== 'AbortError') logger.warn('VideoPlayer', 'Muted autoplay also failed.', e);
                             });
                         }
                     }
@@ -662,8 +663,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         const orientation = screen.orientation as any;
         if (typeof screen !== 'undefined' && orientation && orientation.lock) {
             const currentType = orientation.type;
-            orientation.lock(currentType).catch((err: any) => {
-                console.error("方向锁定失败:", err);
+            orientation.lock(currentType).catch((err: unknown) => {
+                logger.error('VideoPlayer', '方向锁定失败:', err);
             });
         }
         showToast("已开启旋转锁定");
