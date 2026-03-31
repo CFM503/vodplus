@@ -73,12 +73,12 @@ export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Ep
                             key={idx}
                             onClick={() => setCurrentEpIndex(idx)}
                             onMouseEnter={() => {
-                                if (currentEpIndex !== idx && ep.url) {
+                                if (idx === currentEpIndex + 1 && ep.url) {
                                     fetch(ep.url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
                                 }
                             }}
                             onTouchStart={() => {
-                                if (currentEpIndex !== idx && ep.url) {
+                                if (idx === currentEpIndex + 1 && ep.url) {
                                     fetch(ep.url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
                                 }
                             }}

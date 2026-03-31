@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import VideoControls from '@/components/player/VideoControls';
 import { CONFIG } from '@/config/config';
-import { useEffect, useRef } from 'react';
 
 interface VideoPlayerProps {
     url: string;
@@ -18,22 +17,6 @@ interface VideoPlayerProps {
     hasPrevEpisode?: boolean;
     hasNextEpisode?: boolean;
     nextEpisodeUrl?: string;
-}
-
-// 预加载视频元数据
-function useVideoPreload(url: string) {
-  useEffect(() => {
-    if (!url) return;
-    
-    // 预加载视频元数据
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.src = url;
-    
-    return () => {
-      video.remove();
-    };
-  }, [url]);
 }
 
 export default function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl }: VideoPlayerProps) {
@@ -57,9 +40,6 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         toast,
         videoScale
     } = player;
-
-    // 预加载当前视频
-    useVideoPreload(url);
 
 
     if (isEmbed) {
