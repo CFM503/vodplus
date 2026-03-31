@@ -176,7 +176,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
-                        startLevel: -1,
+                        startLevel: 0,
+                        startPosition: 0,
                         enableWorker: true,
                         maxBufferLength: maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
@@ -285,26 +286,16 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isBuffering, isEmbed]);
 
-    // Autoplay with Muted Fallback
+    // Autoplay: start muted for instant playback
     useEffect(() => {
         if (autoplay && videoRef.current && !isLoading) {
+            videoRef.current.muted = true;
+            setIsMuted(true);
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
-                    if (error.name === 'AbortError') return; // Ignore intentional aborts
-
-                    // Squelch the error, it's expected on some browsers without interaction
-                    logger.warn('VideoPlayer', 'Unmuted autoplay failed, switching to muted.', error instanceof Error ? error.message : String(error));
-
-                    if (videoRef.current) {
-                        videoRef.current.muted = true;
-                        setIsMuted(true);
-                        const mutedPromise = videoRef.current.play();
-                        if (mutedPromise !== undefined) {
-                            mutedPromise.catch(e => {
-                                if (!(e instanceof Error) || e.name !== 'AbortError') logger.warn('VideoPlayer', 'Muted autoplay also failed.', e);
-                            });
-                        }
+                    if (error.name !== 'AbortError') {
+                        logger.warn('VideoPlayer', 'Autoplay failed:', error);
                     }
                 });
             }
