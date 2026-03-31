@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' wsrv.nl weserv.nl image.tmdb.org images.unsplash.com data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' wsrv.nl;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' wsrv.nl weserv.nl image.tmdb.org images.unsplash.com data: blob:; media-src 'self' blob: https: http:; font-src 'self' data:; connect-src 'self' wsrv.nl https: http:;",
           },
         ],
       },
