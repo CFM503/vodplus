@@ -9,8 +9,6 @@ import { useState, useRef } from 'react';
 import { CONFIG } from '@/config/config';
 import Link from 'next/link';
 import { parseVodPlayUrl } from '@/lib/vodParser';
-import { usePrefetch } from '@/lib/cacheManager';
-
 export function MovieCard({ movie, className, index = 999 }: { movie: Movie; className?: string; index?: number }) {
     if (!movie) return null;
 
