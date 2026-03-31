@@ -176,8 +176,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
-                        startLevel: 0,
-                        startPosition: 0,
+                        startLevel: -1,
+                        abrEwmaDefaultEstimate: 5000000,
                         enableWorker: true,
                         maxBufferLength: maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
