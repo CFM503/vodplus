@@ -177,7 +177,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
                         startLevel: -1,
-                        abrEwmaDefaultEstimate: 5000000,
                         enableWorker: true,
                         maxBufferLength: maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
