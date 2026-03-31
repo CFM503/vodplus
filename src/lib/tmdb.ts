@@ -39,9 +39,12 @@ function normalizeTmdbToMovie(item: TmdbItem, type: 'movie' | 'tv'): Movie {
 export async function getTmdbTrending(type: 'movie' | 'tv' = 'movie'): Promise<Movie[]> {
     try {
         const res = await fetchWithTimeout(
-            `${TMDB_BASE_URL}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=zh-CN`,
+            `${TMDB_BASE_URL}/trending/${type}/week?language=zh-CN`,
             2500,
-            { next: { revalidate: 43200 } }
+            {
+                next: { revalidate: 43200 },
+                headers: { Authorization: `Bearer ${TMDB_API_KEY}` }
+            }
         );
 
         if (!res.ok) throw new Error(`TMDB API error: ${res.status}`);
@@ -59,9 +62,12 @@ export async function getTmdbTrending(type: 'movie' | 'tv' = 'movie'): Promise<M
 export async function getTmdbPopular(type: 'movie' | 'tv' = 'movie'): Promise<Movie[]> {
     try {
         const res = await fetchWithTimeout(
-            `${TMDB_BASE_URL}/${type}/popular?api_key=${TMDB_API_KEY}&language=zh-CN`,
+            `${TMDB_BASE_URL}/${type}/popular?language=zh-CN`,
             2500,
-            { next: { revalidate: 43200 } }
+            {
+                next: { revalidate: 43200 },
+                headers: { Authorization: `Bearer ${TMDB_API_KEY}` }
+            }
         );
 
         if (!res.ok) throw new Error(`TMDB API error: ${res.status}`);
@@ -79,9 +85,12 @@ export async function getTmdbPopular(type: 'movie' | 'tv' = 'movie'): Promise<Mo
 export async function getTmdbDiscover(type: 'movie' | 'tv' = 'movie', page: number = 1): Promise<Movie[]> {
     try {
         const res = await fetchWithTimeout(
-            `${TMDB_BASE_URL}/discover/${type}?api_key=${TMDB_API_KEY}&language=zh-CN&sort_by=popularity.desc&page=${page}`,
+            `${TMDB_BASE_URL}/discover/${type}?language=zh-CN&sort_by=popularity.desc&page=${page}`,
             2500,
-            { next: { revalidate: 43200 } }
+            {
+                next: { revalidate: 43200 },
+                headers: { Authorization: `Bearer ${TMDB_API_KEY}` }
+            }
         );
 
         if (!res.ok) throw new Error(`TMDB API error: ${res.status}`);
