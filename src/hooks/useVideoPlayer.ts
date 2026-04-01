@@ -285,16 +285,25 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isBuffering, isEmbed]);
 
-    // Autoplay: start muted for instant playback
+    // Autoplay with Muted Fallback
     useEffect(() => {
         if (autoplay && videoRef.current && !isLoading) {
-            videoRef.current.muted = true;
-            setIsMuted(true);
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
-                    if (error.name !== 'AbortError') {
-                        logger.warn('VideoPlayer', 'Autoplay failed:', error);
+                    if (error.name === 'AbortError') return;
+
+                    logger.warn('VideoPlayer', 'Autoplay failed, trying muted.', error instanceof Error ? error.message : String(error));
+
+                    if (videoRef.current) {
+                        videoRef.current.muted = true;
+                        setIsMuted(true);
+                        const mutedPromise = videoRef.current.play();
+                        if (mutedPromise !== undefined) {
+                            mutedPromise.catch(e => {
+                                if (e instanceof Error && e.name !== 'AbortError') logger.warn('VideoPlayer', 'Muted autoplay also failed.', e);
+                            });
+                        }
                     }
                 });
             }
