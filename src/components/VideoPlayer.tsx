@@ -122,6 +122,20 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                         <span className="text-white font-medium text-sm tracking-widest animate-pulse text-shadow-sm">
                             {isLoading ? '正在加载...' : '正在缓冲...'}
                         </span>
+                        {/* Buffering Progress */}
+                        {isBuffering && player.buffered > 0 && (
+                            <div className="flex items-center gap-2">
+                                <div className="w-32 h-1 bg-white/20 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-indigo-400 rounded-full transition-all duration-300"
+                                        style={{ width: `${player.buffered}%` }}
+                                    />
+                                </div>
+                                <span className="text-white/70 text-xs font-mono">
+                                    {Math.round(player.buffered)}%
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

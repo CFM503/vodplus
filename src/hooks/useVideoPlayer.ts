@@ -176,7 +176,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
-                        startLevel: -1,
+                        startLevel: -1, // Auto: start from middle level for faster playback
                         enableWorker: true,
                         maxBufferLength: maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
@@ -188,6 +188,10 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                         levelLoadingMaxRetry: 4,
                         fragLoadingTimeOut: 20000,
                         fragLoadingMaxRetry: 6,
+                        // Optimize for faster startup
+                        testBandwidth: false, // Skip bandwidth test for faster startup
+                        abrEwmaFastLive: 3.0, // Faster adaptive bitrate response
+                        abrEwmaSlowLive: 10.0,
                         xhrSetup: function (xhr: XMLHttpRequest, _url: string) {
                             xhr.withCredentials = false;
                         },
@@ -383,11 +387,27 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
                 setProgress(currentProgressPercent);
                 updateBuffered();
 
-                // Next Episode implicit preload logic (at 80% progress)
-                if (nextEpisodeUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 80) {
+                // Next Episode implicit preload logic (at 60% progress for better UX)
+                if (nextEpisodeUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 60) {
                     hasPrefetchedNextRef.current = true;
                     // Pre fetch the next episode manifest silently in background
                     fetch(nextEpisodeUrl, { mode: 'cors' }).catch(() => { /* ignore */ });
+                    
+                    // Also try to prefetch the first segment of next episode for instant switch
+                    // This is a best-effort optimization
+                    if ('connection' in navigator) {
+                        const conn = (navigator as any).connection;
+                        // Only prefetch on fast connections
+                        if (!conn || conn.effectiveType === '4g' || conn.effectiveType === '3g') {
+                            // Use low priority to avoid interfering with current playback
+                            const link = document.createElement('link');
+                            link.rel = 'prefetch';
+                            link.href = nextEpisodeUrl;
+                            link.as = 'fetch';
+                            link.crossOrigin = 'anonymous';
+                            document.head.appendChild(link);
+                        }
+                    }
                 }
             }
         };
@@ -827,7 +847,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         }
 
         lastTapRef.current = now;
-    }, [isLocked, togglePlay, toggleFullscreen, setIsHovering, showToast]);
+    }, [togglePlay, toggleFullscreen, handleSeekRelative, showGestureHUD]);
 
     // Auto-hide controls
     useEffect(() => {
@@ -852,6 +872,60 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     useEffect(() => {
         if (!isHovering) setShowSettings(false);
     }, [isHovering]);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in input fields
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            
+            const video = videoRef.current;
+            if (!video) return;
+
+            switch (e.key.toLowerCase()) {
+                case ' ': // Space: Play/Pause
+                case 'k':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'arrowleft': // Left: Rewind 5s
+                    e.preventDefault();
+                    handleSeekRelative(-5);
+                    break;
+                case 'arrowright': // Right: Forward 5s
+                    e.preventDefault();
+                    handleSeekRelative(5);
+                    break;
+                case 'arrowup': // Up: Volume +
+                    e.preventDefault();
+                    handleVolumeChange(Math.min(1, volume + 0.1));
+                    break;
+                case 'arrowdown': // Down: Volume -
+                    e.preventDefault();
+                    handleVolumeChange(Math.max(0, volume - 0.1));
+                    break;
+                case 'f': // F: Fullscreen
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case 'p': // P: Picture-in-Picture
+                    e.preventDefault();
+                    if (document.pictureInPictureElement) {
+                        document.exitPictureInPicture();
+                    } else if (document.pictureInPictureEnabled && video) {
+                        video.requestPictureInPicture().catch(() => {});
+                    }
+                    break;
+                case 'm': // M: Mute
+                    e.preventDefault();
+                    toggleMute();
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [togglePlay, handleSeekRelative, handleVolumeChange, toggleFullscreen, toggleMute, volume]);
 
 
 

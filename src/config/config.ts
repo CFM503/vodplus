@@ -13,12 +13,6 @@ export const CONFIG = {
     // 2. 详情页自动匹配播放源 (getMovieDetail -> fetchFromSource)
     // 3. 首页/片库页的分类数据加载 (getRecentMovies, fetchMixedCategory)
     // 注意：调大此值可提高成功率，但会增加无结果时的等待时间
-    // 片源搜索超时时间 (毫秒)
-    // 影响范围：
-    // 1. 全库关键词搜索 (searchAllSources)
-    // 2. 详情页自动匹配播放源 (getMovieDetail -> fetchFromSource)
-    // 3. 首页/片库页的分类数据加载 (getRecentMovies, fetchMixedCategory)
-    // 注意：调大此值可提高成功率，但会增加无结果时的等待时间
     SEARCH_TIMEOUT: 10000,
 
     // 详情页自动匹配时的并发批次大小

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { execSync } from "child_process";
+import withPWA from '@ducanh2912/next-pwa';
 
 let commitId = '';
 try {
@@ -37,8 +38,6 @@ const nextConfig: NextConfig = {
     ];
   },
 };
-
-import withPWA from '@ducanh2912/next-pwa';
 
 const pwaConfig = withPWA({
   dest: 'public',

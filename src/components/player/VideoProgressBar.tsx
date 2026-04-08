@@ -228,9 +228,9 @@ export default function VideoProgressBar({ player, url, variant, className }: Vi
                     height: (isHovering || isDragging) ? `${CONFIG.PROGRESS_BAR_HEIGHT + 2}px` : `${CONFIG.PROGRESS_BAR_HEIGHT}px`,
                 }}
             >
-                {/* Buffered Bar */}
+                {/* Buffered Bar - Enhanced with smooth transition and better visibility */}
                 <div
-                    className="absolute left-0 top-0 h-full bg-white/40 transition-all duration-200"
+                    className="absolute left-0 top-0 h-full bg-white/30 transition-all duration-300 ease-out"
                     style={{ width: `${buffered}%` }}
                 />
 
