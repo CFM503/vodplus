@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Movie } from '@/types';
 import { MovieCard } from '@/components/MovieCard';
-import { Loader2, SearchX, AlertCircle, Radio } from 'lucide-react';
+import { Loader2, SearchX, AlertCircle, Radio, Calendar } from 'lucide-react';
 import { CONFIG } from '@/config/config';
 import { useSourceLatency } from '@/hooks/useSourceLatency';
 
@@ -177,8 +177,29 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
         }
     }, [latencies, getLatency]);
 
+    // Year filter state
+    const [selectedYear, setSelectedYear] = useState<string>('all');
+
+    // Extract unique years from results
+    const availableYears = useMemo(() => {
+        const years = new Set<string>();
+        results.forEach(movie => {
+            if (movie.vod_year) {
+                years.add(movie.vod_year.toString());
+            }
+        });
+        return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
+    }, [results]);
+
+    // Filter results by selected year
+    const filteredResults = useMemo(() => {
+        if (selectedYear === 'all') return results;
+        return results.filter(movie => movie.vod_year?.toString() === selectedYear);
+    }, [results, selectedYear]);
+
     const pendingCount = statuses.filter(s => s.status === 'pending').length;
     const hasResults = results.length > 0;
+    const filteredCount = filteredResults.length;
 
     return (
         <div>
@@ -220,12 +241,61 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
                 ))}
             </div>
 
+            {/* Year Filter */}
+            {hasResults && availableYears.length > 0 && (
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-medium text-slate-300">按年份筛选</span>
+                        <span className="text-xs text-slate-500">({filteredCount} / {results.length} 部)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {/* All Years Button */}
+                        <button
+                            onClick={() => setSelectedYear('all')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                                selectedYear === 'all'
+                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-indigo-500/50 hover:text-indigo-400'
+                            }`}
+                        >
+                            全部
+                        </button>
+                        {/* Year Buttons */}
+                        {availableYears.map(year => (
+                            <button
+                                key={year}
+                                onClick={() => setSelectedYear(year)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                                    selectedYear === year
+                                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-indigo-500/50 hover:text-indigo-400'
+                                }`}
+                            >
+                                {year}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Results Grid */}
-            {hasResults && (
+            {filteredCount > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 mb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {results.map((movie, idx) => (
-                        <MovieCard key={`${movie.vod_id}-${idx}`} movie={movie} />
+                    {filteredResults.map((movie, idx) => (
+                        <MovieCard key={`${movie.vod_id}-${movie.source_id}-${idx}`} movie={movie} />
                     ))}
+                </div>
+            )}
+
+            {/* No Results After Filter */}
+            {hasResults && filteredCount === 0 && selectedYear !== 'all' && (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                    <div className="bg-slate-900 rounded-full p-6 mb-4">
+                        <Calendar className="w-12 h-12 opacity-50" />
+                    </div>
+                    <p className="text-lg font-medium">没有找到 {selectedYear} 年的视频</p>
+                    <p className="text-sm mt-2">请尝试选择其他年份或查看全部</p>
                 </div>
             )}
 
