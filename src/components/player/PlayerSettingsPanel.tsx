@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Gauge, ZoomIn, X, FastForward, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +38,11 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
         setLocalSkipTime(next);
         handleSkipIntroChange(next);
     };
+    
+    // Sync local state when ref changes (e.g., from session storage)
+    useEffect(() => {
+        setLocalSkipTime(skipIntroTime.current);
+    }, [skipIntroTime.current]);
 
     return (
         <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left", className)}>
@@ -163,9 +168,9 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
                 </div>
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => onSkipChange(-5)}
+                        onClick={() => onSkipChange(-10)}
                         className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
-                        title="-5s"
+                        title="-10s"
                     >
                         <ChevronLeft className="w-4 h-4 text-slate-300" />
                     </button>
@@ -173,9 +178,9 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
                         {localSkipTime}s
                     </span>
                     <button
-                        onClick={() => onSkipChange(5)}
+                        onClick={() => onSkipChange(10)}
                         className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
-                        title="+5s"
+                        title="+10s"
                     >
                         <ChevronRight className="w-4 h-4 text-slate-300" />
                     </button>

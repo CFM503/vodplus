@@ -26,6 +26,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleVideoClick, handleMouseMove, handleTouchStart, handleTouchMove,
         handleTouchEnd, isLocked, isEmbed, brightness, gestureHUD, toast, videoScale,
+        isMuted, togglePlay, showSettings,
     } = player;
 
     // Memoized subset APIs for child components
@@ -113,7 +114,15 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onClick={handleVideoClick}
+            onClick={() => {
+                if (!showSettings) {
+                    togglePlay();
+                }
+            }} onDoubleClick={(e) => {
+                if (!showSettings) {
+                    handleVideoClick(e);
+                }
+            }}
         >
             {/* Video Element */}
             <video
@@ -123,6 +132,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 playsInline
                 preload="metadata"
                 crossOrigin="anonymous"
+                muted={isMuted}
                 style={!isLocked ? { transform: `scale(${videoScale})`, transformOrigin: 'center center' } : undefined}
             />
 

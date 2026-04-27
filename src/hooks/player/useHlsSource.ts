@@ -141,17 +141,13 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
         };
     }, [url, isEmbed]);
 
-    // Update HLS buffer config dynamically - restart loading to apply new buffer limits
+    // Update HLS buffer config dynamically
     useEffect(() => {
-        if (hlsRef.current && !isEmbed) {
-            (hlsRef.current.config as any).maxBufferLength = maxBufferLength;
-            (hlsRef.current.config as any).maxMaxBufferLength = maxBufferLength * 2;
-            // Restart loading to apply new buffer limits
-            if (hlsRef.current.currentLevel !== -1) {
-                hlsRef.current.stopLoad();
-                hlsRef.current.startLoad(-1);
-            }
-        }
+        if (!hlsRef.current || isEmbed) return;
+        
+        const hls = hlsRef.current;
+        (hls.config as any).maxBufferLength = maxBufferLength;
+        (hls.config as any).maxMaxBufferLength = maxBufferLength * 2;
     }, [maxBufferLength, isEmbed]);
 
     // Visibility handling

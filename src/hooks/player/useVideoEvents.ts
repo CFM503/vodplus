@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 
 interface UseVideoEventsProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -141,6 +141,35 @@ export function useVideoEvents({
     const setProgress = useCallback((pct: number) => {
         setProgressState(pct);
     }, []);
+
+    // Initial sync when video element is ready (before first paint)
+    useLayoutEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        
+        const applyInit = () => {
+            video.volume = volume;
+            video.muted = isMuted;
+        };
+        
+        if (video.readyState >= 1) {
+            applyInit();
+        } else {
+            video.addEventListener('loadedmetadata', applyInit, { once: true });
+        }
+        
+        return () => {
+            video.removeEventListener('loadedmetadata', applyInit);
+        };
+    }, []);
+
+    // Sync volume and muted to video element when loading completes
+    useEffect(() => {
+        if (!isLoading && videoRef.current) {
+            videoRef.current.volume = volume;
+            videoRef.current.muted = isMuted;
+        }
+    }, [isLoading, volume, isMuted]);
 
     // Sync playback rate, volume, mute to video element
     useEffect(() => {

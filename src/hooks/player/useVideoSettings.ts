@@ -41,8 +41,8 @@ export function useVideoSettings({
 
     const handleScaleChange = useCallback((scale: number) => {
         setVideoScale(scale);
-        showToast(`画面比例已缩放至 ${scale}x`);
         setShowSettings(false);
+        showToast(`画面比例已缩放至 ${scale}x`);
     }, [setVideoScale, showToast]);
 
     const handleBufferChange = useCallback((buf: number) => {
@@ -69,6 +69,7 @@ export function useVideoSettings({
                 orientation.lock(currentType).catch((err: unknown) => {
                     logger.error('VideoPlayer', '方向锁定失败:', err);
                 });
+        setShowSettings(false);
             }
         }
         showToast("已开启旋转锁定");
