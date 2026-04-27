@@ -1,35 +1,36 @@
-
 import React, { useState } from 'react';
 import { Settings, Gauge, ZoomIn, X, FastForward, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 
-type PlayerState = ReturnType<typeof useVideoPlayer>;
+interface SettingsPanelApi {
+    currentLevel: number;
+    levels: { height: number; index: number }[];
+    activeLevelIdx: number;
+    playbackRate: number;
+    handleRateChange: (rate: number) => void;
+    videoScale: number;
+    handleScaleChange: (scale: number) => void;
+    maxBufferLength: number;
+    handleBufferChange: (buf: number) => void;
+    handleResolutionChange: (idx: number) => void;
+    skipIntroTime: React.RefObject<number>;
+    handleSkipIntroChange: (seconds: number) => void;
+}
 
 interface PlayerSettingsPanelProps {
-    player: PlayerState;
+    settingsApi: SettingsPanelApi;
     onClose: () => void;
     className?: string;
 }
 
-export default function PlayerSettingsPanel({ player, onClose, className }: PlayerSettingsPanelProps) {
+export default function PlayerSettingsPanel({ settingsApi, onClose, className }: PlayerSettingsPanelProps) {
     const {
-        currentLevel,
-        levels,
-        activeLevelIdx,
-        playbackRate,
-        handleRateChange,
-        videoScale,
-        handleScaleChange,
-        maxBufferLength,
-        handleBufferChange,
-        handleResolutionChange,
-        skipIntroTime,
-        handleSkipIntroChange,
-    } = player;
+        currentLevel, levels, activeLevelIdx, playbackRate, handleRateChange,
+        videoScale, handleScaleChange, maxBufferLength, handleBufferChange,
+        handleResolutionChange, skipIntroTime, handleSkipIntroChange,
+    } = settingsApi;
 
-    // 本地 state 管理跳过片头秒数的显示，从 Ref 初始化
-    // 这样修改跳过时间不会触发 useVideoPlayer 的重渲染
+    // Local state for skip intro time display, initialized from ref
     const [localSkipTime, setLocalSkipTime] = useState(() => skipIntroTime.current);
 
     const onSkipChange = (delta: number) => {
@@ -40,69 +41,63 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
 
     return (
         <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left", className)}>
-            {/* Panel Header with Close Button */}
+            {/* Panel Header */}
             <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
                 <span className="text-sm font-bold text-white">播放设置</span>
-                <button
-                    onClick={onClose}
-                    className="p-1 hover:bg-white/10 rounded-full transition-colors"
-                >
+                <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
                     <X className="w-5 h-5 text-slate-400 hover:text-white" />
                 </button>
             </div>
 
             {/* Resolution Selection */}
-            <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                    <Settings className="w-4 h-4 text-indigo-400" />
-                    <span className="text-sm font-semibold text-white">分辨率 / 自动</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => handleResolutionChange(-1)}
-                        className={cn(
-                            "px-3 py-1.5 rounded-full text-xs transition-all border",
-                            currentLevel === -1
-                                ? "bg-indigo-600 border-indigo-500 text-white"
-                                : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
-                        )}
-                    >
-                        自动 {currentLevel === -1 && levels[activeLevelIdx] && `(${levels[activeLevelIdx].height}p)`}
-                    </button>
-                    {levels.map((level) => (
+            {levels.length > 0 && (
+                <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>清晰度</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
                         <button
-                            key={level.index}
-                            onClick={() => handleResolutionChange(level.index)}
+                            onClick={() => handleResolutionChange(-1)}
                             className={cn(
-                                "px-3 py-1.5 rounded-full text-xs transition-all border flex items-center gap-1",
-                                currentLevel === level.index
-                                    ? "bg-indigo-600 border-indigo-500 text-white"
-                                    : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
+                                "px-3 py-1.5 text-xs rounded-md transition-all",
+                                currentLevel === -1 ? "bg-indigo-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/20"
                             )}
                         >
-                            {level.height}p
-                            {level.height >= 720 && <span className="text-[8px] bg-red-600 px-1 rounded-sm leading-tight">HD</span>}
+                            自动
                         </button>
-                    ))}
+                        {levels.map((level) => (
+                            <button
+                                key={level.index}
+                                onClick={() => handleResolutionChange(level.index)}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs rounded-md transition-all",
+                                    activeLevelIdx === level.index
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white/10 text-slate-300 hover:bg-white/20"
+                                )}
+                            >
+                                {level.height}p
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Playback Speed */}
             <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                    <Gauge className="w-4 h-4 text-indigo-400" />
-                    <span className="text-sm font-semibold text-white">播放速度</span>
+                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    <Gauge className="w-3.5 h-3.5" />
+                    <span>播放速度</span>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                    {[0.75, 1, 1.5, 2, 3].map(rate => (
+                <div className="flex flex-wrap gap-1.5">
+                    {[0.75, 1, 1.25, 1.5, 2, 3].map((rate) => (
                         <button
                             key={rate}
                             onClick={() => handleRateChange(rate)}
                             className={cn(
-                                "px-1 py-1.5 rounded text-xs transition-all border",
-                                playbackRate === rate
-                                    ? "bg-indigo-600 border-indigo-500 text-white"
-                                    : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                                "px-3 py-1.5 text-xs rounded-md transition-all",
+                                playbackRate === rate ? "bg-indigo-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/20"
                             )}
                         >
                             {rate}x
@@ -111,22 +106,20 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                 </div>
             </div>
 
-            {/* Video Scale */}
-            <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                    <ZoomIn className="w-4 h-4 text-indigo-400" />
-                    <span className="text-sm font-semibold text-white">画面缩放</span>
+            {/* Video Zoom */}
+            <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    <ZoomIn className="w-3.5 h-3.5" />
+                    <span>画面缩放</span>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                    {[1, 1.25, 1.5, 2, 3].map(scale => (
+                <div className="flex flex-wrap gap-1.5">
+                    {[1, 1.5, 2, 3].map((scale) => (
                         <button
                             key={scale}
                             onClick={() => handleScaleChange(scale)}
                             className={cn(
-                                "px-1 py-1.5 rounded text-xs transition-all border",
-                                videoScale === scale
-                                    ? "bg-indigo-600 border-indigo-500 text-white"
-                                    : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                                "px-3 py-1.5 text-xs rounded-md transition-all",
+                                videoScale === scale ? "bg-indigo-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/20"
                             )}
                         >
                             {scale}x
@@ -135,58 +128,57 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                 </div>
             </div>
 
-            {/* Buffer Depth */}
-            <div>
-                <div className="flex items-center gap-2 mb-2">
-                    <Settings className="w-4 h-4 text-indigo-400" />
-                    <span className="text-sm font-semibold text-white">缓存深度 (秒)</span>
+            {/* Buffer Strategy */}
+            <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    <span>缓存策略</span>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                    {[10, 30, 60, 120, 180].map(buf => (
+                <div className="flex flex-wrap gap-1.5">
+                    {[
+                        { label: '极速', value: 10 },
+                        { label: '平衡', value: 30 },
+                        { label: '流畅', value: 60 },
+                        { label: '超级流畅', value: 120 },
+                    ].map(({ label, value }) => (
                         <button
-                            key={buf}
-                            onClick={() => handleBufferChange(buf)}
+                            key={value}
+                            onClick={() => handleBufferChange(value)}
                             className={cn(
-                                "px-1 py-1.5 rounded text-xs transition-all border",
-                                maxBufferLength === buf
-                                    ? "bg-indigo-600 border-indigo-500 text-white"
-                                    : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                                "px-3 py-1.5 text-xs rounded-md transition-all",
+                                maxBufferLength === value ? "bg-indigo-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/20"
                             )}
                         >
-                            {buf}s
+                            {label}
                         </button>
                     ))}
                 </div>
-                <p className="mt-2 text-[10px] text-slate-500 italic">增加缓存可减少网络卡顿，但会增加启动耗时</p>
             </div>
 
-            {/* Skip Intro Settings */}
-            <div className="mt-6 pt-6 border-t border-white/10">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <FastForward className="w-4 h-4 text-indigo-400" />
-                        <span className="text-sm font-semibold text-white">跳过片头</span>
-                    </div>
-                    <div className="flex items-center gap-3 bg-slate-800 rounded-lg p-1 border border-white/5">
-                        <button
-                            onClick={() => onSkipChange(-10)}
-                            className="p-1 hover:bg-white/10 rounded transition-colors text-slate-400 hover:text-white"
-                            disabled={localSkipTime <= 0}
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <span className="text-xs font-mono text-white min-w-[32px] text-center">
-                            {localSkipTime}s
-                        </span>
-                        <button
-                            onClick={() => onSkipChange(10)}
-                            className="p-1 hover:bg-white/10 rounded transition-colors text-slate-400 hover:text-white"
-                        >
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
-                    </div>
+            {/* Skip Intro */}
+            <div>
+                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                    <FastForward className="w-3.5 h-3.5" />
+                    <span>跳过片头</span>
                 </div>
-                <p className="mt-2 text-[10px] text-slate-500 italic">下次播放生效，关闭浏览器后重置</p>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => onSkipChange(-5)}
+                        className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
+                        title="-5s"
+                    >
+                        <ChevronLeft className="w-4 h-4 text-slate-300" />
+                    </button>
+                    <span className="text-white text-sm font-mono min-w-[4rem] text-center select-none">
+                        {localSkipTime}s
+                    </span>
+                    <button
+                        onClick={() => onSkipChange(5)}
+                        className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md transition-colors"
+                        title="+5s"
+                    >
+                        <ChevronRight className="w-4 h-4 text-slate-300" />
+                    </button>
+                </div>
             </div>
         </div>
     );

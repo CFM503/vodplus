@@ -1,70 +1,63 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
-import { logger } from '@/lib/logger';
+import { formatTime } from '@/lib/player-utils';
+import { useHlsSource } from '@/hooks/player/useHlsSource';
+import { useVideoEvents } from '@/hooks/player/useVideoEvents';
+import { useVideoSeek } from '@/hooks/player/useVideoSeek';
+import { useVideoGestures } from '@/hooks/player/useVideoGestures';
+import { useVideoKeyboard } from '@/hooks/player/useVideoKeyboard';
+import { useVideoSettings } from '@/hooks/player/useVideoSettings';
+import { useVideoControls } from '@/hooks/player/useVideoControls';
+import { usePlaybackHealth } from '@/hooks/player/usePlaybackHealth';
 
 interface VideoPlayerProps {
     url: string;
     onEnded?: () => void;
     autoplay?: boolean;
-    nextEpisodeUrl?: string; // Opt-in: URL of the next episode for preloading
+    nextEpisodeUrl?: string;
+}
+
+interface GestureHUDState {
+    icon: 'volume' | 'brightness' | 'seek';
+    value: string;
+    visible: boolean;
+}
+
+interface ToastState {
+    message: string;
+    visible: boolean;
 }
 
 export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl }: VideoPlayerProps) {
-    // Refs
+    // ===========================
+    // Shared Refs
+    // ===========================
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const progressBarRef = useRef<HTMLDivElement>(null);
-    const progressRectRef = useRef<DOMRect | null>(null);
-    const hlsRef = useRef<InstanceType<typeof Hls> | null>(null);
-    const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const lastTapRef = useRef(0);
-    const lastMousePosRef = useRef({ x: 0, y: 0 });
-    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const lastSeekEndTimeRef = useRef(0); // For click suppression
-    const hasSkippedIntroRef = useRef(false);
-    const hasPrefetchedNextRef = useRef(false);
-    const skipIntroTimeRef = useRef(0); // Ref 镜像，解决 timeupdate 闭包捕获陈旧值问题
+    const lastSeekEndTimeRef = useRef(0);
 
-    // State
-    const [isPlaying, setIsPlaying] = useState(false);
+    // ===========================
+    // Cross-cutting State (owned by orchestrator, used by multiple hooks)
+    // ===========================
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [isHovering, setIsHovering] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isBuffering, setIsBuffering] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
-    const [videoScale, setVideoScale] = useState(1);
-    const [isLocked, setIsLocked] = useState(false);
-    const [isWebFullscreen, setIsWebFullscreen] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragProgress, setDragProgress] = useState(0);
-    const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-    const [levels, setLevels] = useState<{ height: number; index: number }[]>([]);
-    const [currentLevel, setCurrentLevel] = useState<number>(-1);
-    const [activeLevelIdx, setActiveLevelIdx] = useState<number>(-1);
-    const [buffered, setBuffered] = useState(0);
     const [maxBufferLength, setMaxBufferLength] = useState(CONFIG.DEFAULT_BUFFER_LENGTH);
-    const [brightness, setBrightness] = useState(100);
+    const [videoScale, setVideoScale] = useState(1);
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
-    const [gestureHUD, setGestureHUD] = useState<{ icon: 'volume' | 'brightness' | 'seek', value: string, visible: boolean }>({
-        icon: 'seek',
-        value: '',
-        visible: false
+    const [brightness, setBrightness] = useState(100);
+    const [gestureHUD, setGestureHUD] = useState<GestureHUDState>({
+        icon: 'seek', value: '', visible: false,
     });
-    // skipIntroTime 完全使用 Ref，不作为 state，避免修改时触发重渲染和 Effect 链
-
-    const touchStartRef = useRef<{ x: number, y: number, time: number, vol: number, brightness: number, currentTime: number } | null>(null);
-    const gestureTypeRef = useRef<'none' | 'vertical-left' | 'vertical-right' | 'horizontal'>('none');
-    const dragProgressRef = useRef(0); // Ref for latest drag position to avoid closure issues
-    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
     const isEmbed = url ? (!url.includes('.m3u8') && !url.includes('.mp4') && !url.includes('.webm') && url.startsWith('http')) : false;
 
-    // Methods
+    // ===========================
+    // Cross-cutting callbacks (defined before sub-hooks)
+    // ===========================
+    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
     const showToast = useCallback((message: string) => {
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast({ message, visible: true });
@@ -73,263 +66,178 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         }, CONFIG.TOAST_DISPLAY_TIME);
     }, []);
 
-    const togglePlay = useCallback(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        if (video.paused) {
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    if (error instanceof Error && error.name !== 'AbortError') {
-                        logger.error('VideoPlayer', 'Play interrupted', error);
-                    }
-                });
-            }
-            setIsPlaying(true);
-        } else {
-            video.pause();
-            setIsPlaying(false);
-        }
+    const showGestureHUD = useCallback((icon: 'volume' | 'brightness' | 'seek', value: string) => {
+        setGestureHUD({ icon, value, visible: true });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     }, []);
 
     const toggleMute = useCallback(() => {
         const video = videoRef.current;
         if (!video) return;
         video.muted = !video.muted;
-        setIsMuted(!isMuted);
-    }, [isMuted]);
+        setIsMuted(muted => !muted);
+    }, []);
 
     const handleVolumeChange = useCallback((newVolume: number) => {
         const video = videoRef.current;
         if (!video) return;
         video.volume = newVolume;
         setVolume(newVolume);
-
         if (newVolume > 0 && video.muted) {
             video.muted = false;
         }
-
         setIsMuted(newVolume === 0);
-    }, []);
-
-    const showGestureHUD = useCallback((icon: 'volume' | 'brightness' | 'seek', value: string) => {
-        setGestureHUD({ icon, value, visible: true });
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    }, []);
-
-    const hideGestureHUD = useCallback(() => {
-        setGestureHUD(prev => ({ ...prev, visible: false }));
     }, []);
 
     const handleSeekRelative = useCallback((seconds: number) => {
         const video = videoRef.current;
         if (!video) return;
         video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
-        setIsHovering(true);
     }, []);
 
-    const handleSkipIntroChange = useCallback((seconds: number) => {
-        const next = Math.max(0, seconds);
-        skipIntroTimeRef.current = next;
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('VOD_SESSION_SKIP_INTRO', next.toString());
+    const handleSpeedHoldStart = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.playbackRate = CONFIG.LONG_PRESS_SPEED;
+        setIsSpeedHolding(true);
+        setGestureHUD({ icon: 'seek', value: `${CONFIG.LONG_PRESS_SPEED}x`, visible: true });
+    }, []);
+
+    const handleSpeedHoldEnd = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.playbackRate = playbackRate;
+        setIsSpeedHolding(false);
+        setGestureHUD(prev => ({ ...prev, visible: false }));
+    }, [playbackRate]);
+
+    // ===========================
+    // Sub-hooks (called in dependency order)
+    // ===========================
+
+    // 1. HLS Source
+    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength });
+
+    // 2. Settings
+    const settings = useVideoSettings({
+        hlsRef: hlsSource.hlsRef,
+        isEmbed,
+        skipIntroTimeRef: hlsSource.skipIntroTimeRef,
+        videoRef,
+        playbackRate,
+        setPlaybackRate,
+        videoScale,
+        setVideoScale,
+        showToast,
+    });
+
+    // 2.5 Playback Health (stall detection + auto-skip)
+    const { resetSkipCount: resetStallSkipCount } = usePlaybackHealth({
+        videoRef,
+        hlsRef: hlsSource.hlsRef,
+        showToast,
+    });
+
+    // Reset skip count when URL changes (new video source)
+    useEffect(() => {
+        resetStallSkipCount();
+    }, [url, resetStallSkipCount]);
+
+    // 3. Video Events
+    const events = useVideoEvents({
+        videoRef,
+        onEnded,
+        autoplay,
+        nextEpisodeUrl,
+        playbackRate,
+        volume,
+        isMuted,
+        isLoading: hlsSource.isLoading,
+        hasPrefetchedNextRef: hlsSource.hasPrefetchedNextRef,
+    });
+
+    // 4. Gestures
+    const gestures = useVideoGestures({
+        videoRef,
+        containerRef,
+        volume,
+        playbackRate,
+        isEmbed,
+        handleVolumeChange,
+        handleSpeedHoldStart,
+        handleSpeedHoldEnd,
+        isSpeedHolding,
+    });
+
+    // 5. Seek (uses isHovering from controls via ref to break cycle)
+    const isHoveringRef = useRef(false);
+    const seek = useVideoSeek({
+        videoRef,
+        progressBarRef,
+        hlsRef: hlsSource.hlsRef,
+        isHoveringRef,
+        setProgress: events.setProgress,
+    });
+
+    // Toggle play (defined after events since it needs events.setIsPlaying)
+    const togglePlay = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (video.paused) {
+            video.play().catch(error => {
+                if (error instanceof Error && error.name !== 'AbortError') { /* ignore */ }
+            });
+            events.setIsPlaying(true);
+        } else {
+            video.pause();
+            events.setIsPlaying(false);
         }
     }, []);
 
-    // Initialization Effect (HLS)
+    // 6. Controls
+    const controls = useVideoControls({
+        containerRef,
+        videoRef,
+        isPlaying: events.isPlaying,
+        isDragging: seek.isDragging,
+        showSettings: settings.showSettings,
+        togglePlay,
+        handleSeekRelative,
+        showGestureHUD,
+        setShowSettings: settings.setShowSettings,
+        lastSeekEndTimeRef,
+    });
+
+    // Sync isHovering to ref for Seek hook
     useEffect(() => {
-        // Reset playback state for new URL
-        setIsLoading(true);
-        setIsBuffering(false);
-        setProgress(0);
-        setLevels([]);
-        setCurrentLevel(-1);
-        setActiveLevelIdx(-1);
-        hasSkippedIntroRef.current = false;
+        isHoveringRef.current = controls.isHovering;
+    }, [controls.isHovering]);
 
-        // Load skip intro time from session storage
-        if (typeof window !== 'undefined') {
-            const saved = sessionStorage.getItem('VOD_SESSION_SKIP_INTRO');
-            if (saved) {
-                skipIntroTimeRef.current = parseInt(saved, 10);
-            }
-        }
+    // 7. Keyboard
+    useVideoKeyboard({
+        videoRef,
+        togglePlay,
+        handleSeekRelative,
+        handleVolumeChange,
+        toggleFullscreen: controls.toggleFullscreen,
+        toggleMute,
+        volume,
+    });
 
-        const video = videoRef.current;
-        if (!video || isEmbed) return;
-
-        const initPlayer = async () => {
-            if (!url) return;
-            if (url.includes('.mp4') || url.includes('.webm')) {
-                video.src = url;
-                setIsLoading(false);
-                // Autoplay handled by useEffect
-                return;
-            }
-
-            try {
-                const { default: Hls } = await import('hls.js');
-
-                if (Hls.isSupported()) {
-                    if (hlsRef.current) hlsRef.current.destroy();
-
-                    const hls = new Hls({
-                        capLevelToPlayerSize: true,
-                        autoStartLoad: true,
-                        startLevel: -1, // Auto: start from middle level for faster playback
-                        enableWorker: true,
-                        maxBufferLength: maxBufferLength,
-                        maxMaxBufferLength: maxBufferLength * 2,
-                        backBufferLength: 90,
-                        lowLatencyMode: false,
-                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
-                        manifestLoadingMaxRetry: 4,
-                        levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
-                        levelLoadingMaxRetry: 4,
-                        fragLoadingTimeOut: 20000,
-                        fragLoadingMaxRetry: 6,
-                        // Optimize for faster startup
-                        testBandwidth: false, // Skip bandwidth test for faster startup
-                        abrEwmaFastLive: 3.0, // Faster adaptive bitrate response
-                        abrEwmaSlowLive: 10.0,
-                        xhrSetup: function (xhr: XMLHttpRequest, _url: string) {
-                            xhr.withCredentials = false;
-                        },
-                    });
-                    hlsRef.current = hls;
-
-                    hls.loadSource(url.trim());
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        const availableLevels = hls.levels.map((l: { height: number }, idx: number) => ({
-                            height: l.height,
-                            index: idx
-                        })).sort((a, b) => b.height - a.height);
-                        setLevels(availableLevels);
-                        setIsLoading(false);
-                    });
-
-                    hls.on(Hls.Events.LEVEL_SWITCHED, (_: unknown, data: { level: number }) => {
-                        setActiveLevelIdx(data.level);
-                    });
-
-                    hls.attachMedia(video);
-
-                    hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string }) => {
-                        if (!data.fatal) return;
-                        switch (data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                hls.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                hls.recoverMediaError();
-                                break;
-                            default:
-                                hls.destroy();
-                                break;
-                        }
-                    });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = url;
-                    video.addEventListener('loadedmetadata', () => {
-                        setIsLoading(false);
-                        // Autoplay handled by useEffect
-                    }, { once: true });
-                }
-            } catch (error: unknown) {
-                logger.error('VideoPlayer', 'Failed to load Hls.js', error);
-                if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = url;
-                    video.addEventListener('loadedmetadata', () => {
-                        setIsLoading(false);
-                        // Autoplay handled by useEffect
-                    }, { once: true });
-                }
-            }
-        };
-
-        // Keep HUD visible while switching/loading
-        setIsHovering(true);
-        initPlayer();
-
-        return () => {
-            if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
-        };
-    }, [url, isEmbed]);
-
-    // Reset prefetch flag and skip flag when url changes
-    useEffect(() => {
-        hasPrefetchedNextRef.current = false;
-        hasSkippedIntroRef.current = false;
-    }, [url]);
-
-    // Update HLS buffer config dynamically without restarting player
-    useEffect(() => {
-        if (hlsRef.current && !isEmbed) {
-            const currentTime = videoRef.current?.currentTime || 0;
-            hlsRef.current.config.maxBufferLength = maxBufferLength;
-            hlsRef.current.config.maxMaxBufferLength = maxBufferLength * 2;
-        }
-    }, [maxBufferLength]);
-
-    // Visibility handling
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && hlsRef.current) {
-                hlsRef.current.startLoad();
-                if (isBuffering && videoRef.current && !videoRef.current.paused) {
-                    hlsRef.current.recoverMediaError();
-                }
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [isBuffering, isEmbed]);
-
-    // Autoplay with Muted Fallback
-    useEffect(() => {
-        if (autoplay && videoRef.current && !isLoading) {
-            const playPromise = videoRef.current.play();
-            if (playPromise !== undefined) {
-                playPromise.catch((error) => {
-                    if (error.name === 'AbortError') return;
-
-                    logger.warn('VideoPlayer', 'Autoplay failed, trying muted.', error instanceof Error ? error.message : String(error));
-
-                    if (videoRef.current) {
-                        videoRef.current.muted = true;
-                        setIsMuted(true);
-                        const mutedPromise = videoRef.current.play();
-                        if (mutedPromise !== undefined) {
-                            mutedPromise.catch(e => {
-                                if (e instanceof Error && e.name !== 'AbortError') logger.warn('VideoPlayer', 'Muted autoplay also failed.', e);
-                            });
-                        }
-                    }
-                });
-            }
-        }
-    }, [autoplay, isLoading]);
-
-    // Skip Intro Logic
-    // 仅在视频加载完成时执行一次跳片头，不依赖 skipIntroTime state
-    // 播放中修改跳过时间只更新 ref，下次视频加载时自动生效
+    // Skip intro effect
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || isLoading || hasSkippedIntroRef.current) return;
+        if (!video || hlsSource.isLoading || hlsSource.hasSkippedIntroRef.current) return;
 
-        const target = skipIntroTimeRef.current;
+        const target = hlsSource.skipIntroTimeRef.current;
         if (target <= 0) {
-            hasSkippedIntroRef.current = true; // 标记为已处理，防止后续触发
+            hlsSource.hasSkippedIntroRef.current = true;
             return;
         }
 
         const doSkip = () => {
-            if (hasSkippedIntroRef.current) return;
-            hasSkippedIntroRef.current = true;
+            if (hlsSource.hasSkippedIntroRef.current) return;
+            hlsSource.hasSkippedIntroRef.current = true;
             video.currentTime = target;
             showToast(`已为您跳过片头 ${target}s`);
         };
@@ -344,655 +252,94 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             video.addEventListener('loadedmetadata', onLoadedMetadata);
             return () => video.removeEventListener('loadedmetadata', onLoadedMetadata);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoading, showToast]);
+    }, [hlsSource.isLoading, showToast]);
 
-    // Progress Bar Rect Cache
-    useEffect(() => {
-        const updateRect = () => {
-            if (progressBarRef.current) {
-                progressRectRef.current = progressBarRef.current.getBoundingClientRect();
-            }
-        };
-        updateRect();
-        window.addEventListener('resize', updateRect);
-        window.addEventListener('fullscreenchange', updateRect);
-        return () => {
-            window.removeEventListener('resize', updateRect);
-            window.removeEventListener('fullscreenchange', updateRect);
-        };
-    }, []);
-
-    // Video Event Listeners
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        const updateBuffered = () => {
-            if (video.duration) {
-                let currentBufferedEnd = 0;
-                for (let i = 0; i < video.buffered.length; i++) {
-                    if (video.buffered.start(i) <= video.currentTime + 0.5 && video.buffered.end(i) >= video.currentTime) {
-                        currentBufferedEnd = video.buffered.end(i);
-                        break;
-                    }
-                }
-                setBuffered((currentBufferedEnd / video.duration) * 100);
-            }
-        };
-
-        const updateProgress = () => {
-            if (video.duration) {
-                const currentProgressPercent = (video.currentTime / video.duration) * 100;
-                setProgress(currentProgressPercent);
-                updateBuffered();
-
-                // Next Episode implicit preload logic (at 60% progress for better UX)
-                if (nextEpisodeUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 60) {
-                    hasPrefetchedNextRef.current = true;
-                    // Pre fetch the next episode manifest silently in background
-                    fetch(nextEpisodeUrl, { mode: 'cors' }).catch(() => { /* ignore */ });
-                    
-                    // Also try to prefetch the first segment of next episode for instant switch
-                    // This is a best-effort optimization
-                    if ('connection' in navigator) {
-                        const conn = (navigator as any).connection;
-                        // Only prefetch on fast connections
-                        if (!conn || conn.effectiveType === '4g' || conn.effectiveType === '3g') {
-                            // Use low priority to avoid interfering with current playback
-                            const link = document.createElement('link');
-                            link.rel = 'prefetch';
-                            link.href = nextEpisodeUrl;
-                            link.as = 'fetch';
-                            link.crossOrigin = 'anonymous';
-                            document.head.appendChild(link);
-                        }
-                    }
-                }
-            }
-        };
-
-        const updateDuration = () => setDuration(video.duration);
-        const handleWaiting = () => setIsBuffering(true);
-        const handlePlaying = () => {
-            setIsBuffering(false);
-            setIsPlaying(true);
-        };
-        const handlePause = () => setIsPlaying(false);
-        const handleSeeking = () => setIsBuffering(true);
-        const handleSeeked = () => {
-            setIsBuffering(false);
-            if (video && !video.paused) setIsPlaying(true);
-        };
-        const handleEnded = () => {
-            setIsPlaying(false);
-            if (onEnded) onEnded();
-        };
-
-        video.addEventListener('timeupdate', updateProgress);
-        video.addEventListener('progress', updateBuffered);
-        video.addEventListener('loadedmetadata', updateDuration);
-        video.addEventListener('waiting', handleWaiting);
-        video.addEventListener('playing', handlePlaying);
-        video.addEventListener('pause', handlePause);
-        video.addEventListener('play', handlePlaying);
-        video.addEventListener('seeking', handleSeeking);
-        video.addEventListener('seeked', handleSeeked);
-        video.addEventListener('ended', handleEnded);
-
-        return () => {
-            video.removeEventListener('timeupdate', updateProgress);
-            video.removeEventListener('progress', updateBuffered);
-            video.removeEventListener('loadedmetadata', updateDuration);
-            video.removeEventListener('waiting', handleWaiting);
-            video.removeEventListener('playing', handlePlaying);
-            video.removeEventListener('pause', handlePause);
-            video.removeEventListener('play', handlePlaying);
-            video.removeEventListener('seeking', handleSeeking);
-            video.removeEventListener('seeked', handleSeeked);
-            video.removeEventListener('ended', handleEnded);
-        };
-    }, [onEnded]);
-
-    // Playback rate, Volume, and Mute sync and restore after loading
-    useEffect(() => {
-        if (videoRef.current && !isLoading) {
-            videoRef.current.playbackRate = playbackRate;
-            videoRef.current.volume = volume;
-            videoRef.current.muted = isMuted;
-        }
-    }, [playbackRate, volume, isMuted, isLoading]);
-
-    // Seek Logic
-    const calculatePosition = useCallback((clientX: number, rect: DOMRect) => {
-        let pos = (clientX - rect.left) / rect.width;
-        pos = Math.max(0, Math.min(1, pos));
-        return pos;
-    }, []);
-
-    const handleSeekStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-        // [MODIFIED] Removed isLocked check to allow seeking even when orientation is locked
-        // if (isLocked) return; 
-
-        // On mobile, only allow seeking if the controls are already visible
-        // This prevents accidental seeks when the user just wants to show the HUD
-        const isTouch = 'touches' in e;
-        if (isTouch && !isHovering) return;
-
-        // Use fresh rect to prevent stale coordinate space
-        if (!progressBarRef.current || !videoRef.current) return;
-        const rect = progressBarRef.current.getBoundingClientRect();
-        progressRectRef.current = rect;
-
-        if (rect.width === 0) return;
-
-        const clientX = 'touches' in e
-            ? (e as React.TouchEvent).touches[0].clientX
-            : (e as React.MouseEvent).clientX;
-
-        const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-
-        // Critical: Set dragging state last to ensure dragProgress is updated in the same frame
-        setDragProgress(percent);
-        dragProgressRef.current = percent;
-        setIsDragging(true);
-
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-    }, [isLocked, isHovering]);
-
-    const handleSeekMove = useCallback((e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
-        if (!isDragging || !progressRectRef.current) return;
-        const rect = progressRectRef.current;
-        const clientX = 'touches' in e
-            ? (e as TouchEvent).touches[0].clientX
-            : ('clientX' in e ? (e as MouseEvent).clientX : 0);
-
-        if (clientX === 0) return;
-        const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-        setDragProgress(percent);
-        dragProgressRef.current = percent;
-    }, [isDragging]);
-
-    const handleSeekEnd = useCallback(() => {
-        if (isDragging) {
-            const video = videoRef.current;
-            if (video && video.duration) {
-                const targetTime = (dragProgressRef.current / 100) * video.duration;
-                if (Number.isFinite(targetTime)) {
-                    video.currentTime = targetTime;
-                    setProgress(dragProgressRef.current);
-                }
-
-                if (hlsRef.current && video.paused && !video.ended) {
-                    seekTimeoutRef.current = setTimeout(() => {
-                        if (hlsRef.current && video.paused) hlsRef.current.startLoad();
-                    }, 100);
-                }
-            }
-            setIsDragging(false);
-            setDragProgress(0); // Reset for next time
-            dragProgressRef.current = 0;
-            progressRectRef.current = null;
-            lastSeekEndTimeRef.current = Date.now(); // Mark end time
-        }
-    }, [isDragging]);
-
-    // Global listeners for desktop dragging
-    useEffect(() => {
-        if (!isDragging) return;
-
-        const onMouseMove = (e: MouseEvent) => handleSeekMove(e);
-        const onMouseUp = () => handleSeekEnd();
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
-    }, [isDragging, handleSeekMove, handleSeekEnd]);
-
-    const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-
-        // On mobile, if controls are not visible, a tap should just show them, not seek.
-        const isTouch = 'touches' in e; // This is a MouseEvent, so 'touches' will be undefined.
-        // However, this function might be called by a touch event handler
-        // that simulates a click. For safety, we'll check if it's a touch-like interaction.
-        // A more robust check for touch events would be needed if this function is directly used for touch.
-        // For now, assuming this is primarily for desktop mouse clicks.
-        // If it's a mobile tap, handleVideoClick should take precedence.
-        if (isTouch && !isHovering) {
-            e.stopPropagation();
-            setIsHovering(true);
-            return;
-        }
-
-        e.stopPropagation();
-
-        // If we just finished dragging, ignore the click event that follows mouseUp
-        if (progressRectRef.current === null) {
-            // This is a clue that we just ended a drag (handled in handleSeekEnd)
-            // But we can check a ref instead for better reliability
-        }
-
-        const video = videoRef.current;
-        if (!video || isDragging) return;
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pos = calculatePosition(e.clientX, rect);
-        if (video.duration) {
-            const targetTime = pos * video.duration;
-            if (Number.isFinite(targetTime)) {
-                video.currentTime = targetTime;
-                setProgress(pos * 100);
-            }
-        }
-    }, [isDragging, calculatePosition, isHovering]);
-
-
-
-    const toggleFullscreen = useCallback(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        if (!document.fullscreenElement) container.requestFullscreen();
-        else document.exitFullscreen();
-    }, []);
-
-    const toggleWebFullscreen = useCallback(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        if (!isWebFullscreen) {
-            container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:999999;background:#000;border-radius:0;';
-            setIsWebFullscreen(true);
-        } else {
-            container.style.cssText = '';
-            setIsWebFullscreen(false);
-        }
-    }, [isWebFullscreen]);
-
-    // Helpers
-    const formatTime = (seconds: number) => {
-        if (isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const handleResolutionChange = (idx: number) => {
-        if (!hlsRef.current) return;
-        hlsRef.current.currentLevel = idx;
-        setCurrentLevel(idx);
-        const label = idx === -1 ? '自动' : `${hlsRef.current.levels[idx]?.height}p`;
-        showToast(`清晰度已切换至：${label}`);
-        setShowSettings(false);
-    };
-
-    const handleRateChange = (rate: number) => {
-        setPlaybackRate(rate);
-        showToast(`播放速度已切换至 ${rate}x`);
-        setShowSettings(false);
-    };
-
-    const handleSpeedHoldStart = useCallback(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        video.playbackRate = CONFIG.LONG_PRESS_SPEED;
-        setIsSpeedHolding(true);
-        // We use the GestureHUD to show the speed status, but manually
-        setGestureHUD({
-            icon: 'seek',
-            value: `${CONFIG.LONG_PRESS_SPEED}x`,
-            visible: true
-        });
-    }, []);
-
-    const handleSpeedHoldEnd = useCallback(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        video.playbackRate = playbackRate; // Restore state rate
-        setIsSpeedHolding(false);
-        setGestureHUD(prev => ({ ...prev, visible: false }));
-    }, [playbackRate]);
-
-    const handleScaleChange = (scale: number) => {
-        setVideoScale(scale);
-        showToast(`画面比例已缩放至 ${scale}x`);
-        setShowSettings(false);
-    };
-
-    const handleBufferChange = (buf: number) => {
-        setMaxBufferLength(buf);
-        const label = buf === 10 ? '极速' : buf === 30 ? '平衡' : buf === 60 ? '流畅' : buf === 120 ? '抗断网' : '超级流畅';
-        showToast(`缓存策略已更新：${label}模式 (${buf}s)`);
-        setShowSettings(false);
-    };
-
-    const handleUnlock = useCallback(() => {
-        setIsLocked(false);
-        if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-        }
-        showToast("已恢复自动旋转");
-    }, []);
-
-    const handleLock = useCallback(() => {
-        setIsLocked(true);
-        // "原地定格" 锁定当前方向 (Smart Orientation Lock)
-        const orientation = screen.orientation as any;
-        if (typeof screen !== 'undefined' && orientation && orientation.lock) {
-            const currentType = orientation.type;
-            orientation.lock(currentType).catch((err: unknown) => {
-                logger.error('VideoPlayer', '方向锁定失败:', err);
-            });
-        }
-        showToast("已开启旋转锁定");
-    }, []);
-
-    // Mouse Move Ghost Check (Mobile Fix)
-    const handleMouseMove = (e: React.MouseEvent) => {
-        const currentX = e.clientX;
-        const currentY = e.clientY;
-        const deltaX = Math.abs(currentX - lastMousePosRef.current.x);
-        const deltaY = Math.abs(currentY - lastMousePosRef.current.y);
-        if (deltaX > 0 || deltaY > 0) {
-            setIsHovering(true);
-            lastMousePosRef.current = { x: currentX, y: currentY };
-        }
-    };
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        if (isEmbed) return;
-        const touch = e.touches[0];
-        touchStartRef.current = {
-            x: touch.clientX,
-            y: touch.clientY,
-            time: Date.now(),
-            vol: volume,
-            brightness: brightness,
-            currentTime: videoRef.current?.currentTime || 0
-        };
-        gestureTypeRef.current = 'none';
-
-        // Long Press Speed Logic (Right 25% Zone)
-        if (containerRef.current) {
-            const rect = containerRef.current.getBoundingClientRect();
-            const isRightZone = touch.clientX > rect.left + rect.width * 0.75;
-
-            if (isRightZone) {
-                longPressTimerRef.current = setTimeout(() => {
-                    handleSpeedHoldStart();
-                }, 500); // 500ms hold to activate
-            }
-        }
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (isEmbed || !touchStartRef.current || !containerRef.current) return;
-
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStartRef.current.x;
-        const deltaY = touch.clientY - touchStartRef.current.y;
-        const containerRect = containerRef.current.getBoundingClientRect();
-
-        // Vertical Swipe (Volume/Brightness) - Threshold 30px
-        if (gestureTypeRef.current === 'none' && Math.abs(deltaY) > CONFIG.GESTURE_VERTICAL_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX) * CONFIG.GESTURE_ASPECT_RATIO_THRESHOLD) {
-            // Cancel long press if swipe detected
-            if (longPressTimerRef.current) {
-                clearTimeout(longPressTimerRef.current);
-                longPressTimerRef.current = null;
-            }
-            // If already holding speed, don't start volume gesture? 
-            // Better behavior: If speed holding active, block other gestures.
-            if (isSpeedHolding) return;
-
-            const isLeft = touchStartRef.current.x < containerRect.left + containerRect.width * 0.5;
-            gestureTypeRef.current = isLeft ? 'vertical-left' : 'vertical-right';
-        }
-
-        // Execute gesture
-        if (gestureTypeRef.current === 'vertical-left') {
-            const brightnessDelta = -(deltaY / containerRect.height) * 100;
-            const newBrightness = Math.max(0, Math.min(200, touchStartRef.current.brightness + brightnessDelta));
-            setBrightness(newBrightness);
-            showGestureHUD('brightness', `${Math.round(newBrightness)}%`);
-        } else if (gestureTypeRef.current === 'vertical-right') {
-            const volumeDelta = -(deltaY / containerRect.height);
-            const newVolume = Math.max(0, Math.min(1, touchStartRef.current.vol + volumeDelta));
-            handleVolumeChange(newVolume);
-            showGestureHUD('volume', `${Math.round(newVolume * 100)}%`);
-        }
-    };
-
-    const handleTouchEnd = (e: React.TouchEvent) => {
-        // Clear long press timer
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-
-        // If holding speed, deactivate and stop everything else
-        if (isSpeedHolding) {
-            handleSpeedHoldEnd();
-            touchStartRef.current = null;
-            gestureTypeRef.current = 'none'; // Reset logic
-            return;
-        }
-
-        if (!touchStartRef.current) return;
-
-        const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-        const touchDuration = Date.now() - touchStartRef.current.time;
-
-        // Handle Tap (if short duration and no significant drag)
-        if (gestureTypeRef.current === 'none' && touchDuration < CONFIG.TAP_MAX_DURATION && Math.abs(deltaX) < CONFIG.TAP_MAX_MOVEMENT) {
-            // Prevent browser from calling mouse events
+    // Wiring: touch end → video click on tap
+    const handleTouchEndWired = useCallback((e: React.TouchEvent) => {
+        const wasTap = gestures.handleTouchEnd(e);
+        if (wasTap) {
             if (e.cancelable) e.preventDefault();
-            handleVideoClick(e);
+            controls.handleVideoClick(e);
         }
-
-        // Cleanup
-        hideGestureHUD();
-        touchStartRef.current = null;
-        gestureTypeRef.current = 'none';
-        setIsHovering(true); // Keep controls visible after swipe
-    };
-
-    // Handle Video Click (Mainly for mouse, or called by handleTouchEnd for tap)
-    const handleVideoClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        const now = Date.now();
-        const isTouch = 'touches' in e || 'changedTouches' in e;
-
-        // Ignore clicks immediately following a seek
-        if (now - lastSeekEndTimeRef.current < CONFIG.SEEK_CLICK_SUPPRESSION_DELAY) return;
-
-        const timeSinceLastTap = now - lastTapRef.current;
-        const isDoubleTap = timeSinceLastTap < CONFIG.DOUBLE_TAP_DELAY;
-
-        if (isTouch) {
-            // Mobile Specific Logic
-            if (isDoubleTap) {
-                // Double tap detected
-                const container = containerRef.current;
-                if (!container) return;
-
-                const rect = container.getBoundingClientRect();
-                const x = 'changedTouches' in e ? e.changedTouches[0].clientX : (e as any).clientX;
-                const relativeX = x - rect.left;
-
-                if (relativeX < rect.width * CONFIG.DOUBLE_TAP_SKIP_ZONE_PERCENT) {
-                    // Left zone -> Rewind
-                    handleSeekRelative(-CONFIG.SKIP_SECONDS);
-                    showGestureHUD('seek', `-${CONFIG.SKIP_SECONDS}s`);
-                } else if (relativeX > rect.width * (1 - CONFIG.DOUBLE_TAP_SKIP_ZONE_PERCENT)) {
-                    // Right zone -> Forward
-                    handleSeekRelative(CONFIG.SKIP_SECONDS);
-                    showGestureHUD('seek', `+${CONFIG.SKIP_SECONDS}s`);
-                } else {
-                    // Middle zone -> Toggle Play/Pause
-                    togglePlay();
-                }
-            } else {
-                // Single Tap on Mobile: JUST toggle HUD visibility (Standard YouTube behavior)
-                // This prevents the accidental play/pause or fullscreen when just wanting to see the UI
-                setIsHovering(prev => !prev);
-            }
-        } else {
-            // Desktop Specific Logic (Standard)
-            if (isDoubleTap) {
-                toggleFullscreen();
-            } else {
-                togglePlay();
-            }
+        if (!wasTap) {
+            controls.setIsHovering(true);
         }
+    }, [gestures.handleTouchEnd, controls.handleVideoClick, controls.setIsHovering]);
 
-        lastTapRef.current = now;
-    }, [togglePlay, toggleFullscreen, handleSeekRelative, showGestureHUD]);
+    // Wiring: mouse move → show controls
+    const handleMouseMoveWired = useCallback((e: React.MouseEvent) => {
+        gestures.handleMouseMove(e);
+        controls.setIsHovering(true);
+    }, [gestures.handleMouseMove, controls.setIsHovering]);
 
-    // Auto-hide controls
-    useEffect(() => {
-        let timeout: NodeJS.Timeout;
+    // Wiring: buffer change → orchestrator maxBufferLength
+    const handleBufferChangeWired = useCallback((buf: number) => {
+        setMaxBufferLength(buf);
+        settings.handleBufferChange(buf);
+    }, [settings.handleBufferChange]);
 
-        // Check if device is touch-primary (mobile/tablet) where hover isn't available
-        // on these devices, we ALWAYS want auto-hide because there's no "mouse leave" to hide controls
-        const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
-
-        // Auto-hide if:
-        // 1. Config is TRUE (User wants auto-hide everywhere)
-        // 2. OR it's a touch device (Mobile experience requires auto-hide)
-        const shouldAutoHide = CONFIG.AUTO_HIDE_CONTROLS || isTouchDevice;
-
-        if (shouldAutoHide && isPlaying && isHovering && !isDragging && !showSettings) {
-            timeout = setTimeout(() => setIsHovering(false), CONFIG.CONTROLS_AUTO_HIDE_TIME);
-        }
-        return () => clearTimeout(timeout);
-    }, [isPlaying, isHovering, isDragging, showSettings]);
-
-    // Auto-close settings when controls hide
-    useEffect(() => {
-        if (!isHovering) setShowSettings(false);
-    }, [isHovering]);
-
-    // Keyboard Shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if typing in input fields
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-            
-            const video = videoRef.current;
-            if (!video) return;
-
-            switch (e.key.toLowerCase()) {
-                case ' ': // Space: Play/Pause
-                case 'k':
-                    e.preventDefault();
-                    togglePlay();
-                    break;
-                case 'arrowleft': // Left: Rewind 5s
-                    e.preventDefault();
-                    handleSeekRelative(-5);
-                    break;
-                case 'arrowright': // Right: Forward 5s
-                    e.preventDefault();
-                    handleSeekRelative(5);
-                    break;
-                case 'arrowup': // Up: Volume +
-                    e.preventDefault();
-                    handleVolumeChange(Math.min(1, volume + 0.1));
-                    break;
-                case 'arrowdown': // Down: Volume -
-                    e.preventDefault();
-                    handleVolumeChange(Math.max(0, volume - 0.1));
-                    break;
-                case 'f': // F: Fullscreen
-                    e.preventDefault();
-                    toggleFullscreen();
-                    break;
-                case 'p': // P: Picture-in-Picture
-                    e.preventDefault();
-                    if (document.pictureInPictureElement) {
-                        document.exitPictureInPicture();
-                    } else if (document.pictureInPictureEnabled && video) {
-                        video.requestPictureInPicture().catch(() => {});
-                    }
-                    break;
-                case 'm': // M: Mute
-                    e.preventDefault();
-                    toggleMute();
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, handleSeekRelative, handleVolumeChange, toggleFullscreen, toggleMute, volume]);
-
-
-
-
+    // ===========================
+    // Return merged API
+    // ===========================
     return {
-        // Refs
         videoRef,
         containerRef,
         progressBarRef,
-        hlsRef,
+        hlsRef: hlsSource.hlsRef,
 
-        // State
-        isPlaying,
+        isPlaying: events.isPlaying,
         isMuted,
         volume,
-        progress,
-        duration,
-        buffered,
-        isHovering,
-        isLoading,
-        isBuffering,
-        showSettings,
+        progress: events.progress,
+        duration: events.duration,
+        buffered: events.buffered,
+        isHovering: controls.isHovering,
+        isLoading: hlsSource.isLoading,
+        isBuffering: events.isBuffering,
+        showSettings: settings.showSettings,
         playbackRate,
         videoScale,
-        isLocked,
-        isWebFullscreen,
-        isDragging,
-        dragProgress,
+        isLocked: settings.isLocked,
+        isWebFullscreen: controls.isWebFullscreen,
+        isDragging: seek.isDragging,
+        dragProgress: seek.dragProgress,
         brightness,
         gestureHUD,
         toast,
-        levels,
-        skipIntroTime: skipIntroTimeRef,
-        handleSkipIntroChange,
-        currentLevel,
-        activeLevelIdx,
+        levels: hlsSource.levels,
+        skipIntroTime: hlsSource.skipIntroTimeRef,
+        handleSkipIntroChange: settings.handleSkipIntroChange,
+        currentLevel: hlsSource.currentLevel,
+        activeLevelIdx: hlsSource.activeLevelIdx,
         maxBufferLength,
         isEmbed,
 
-        // Setters
-        setIsHovering,
-        setShowSettings,
+        setIsHovering: controls.setIsHovering,
+        setShowSettings: settings.setShowSettings,
 
-        // Handlers
         togglePlay,
         toggleMute,
         handleVolumeChange,
-        handleSeekStart,
-        handleSeekMove,
-        handleSeekEnd,
-        handleProgressClick,
-        toggleFullscreen,
-        toggleWebFullscreen,
-        handleResolutionChange,
-        handleRateChange,
+        handleSeekStart: seek.handleSeekStart,
+        handleSeekMove: seek.handleSeekMove,
+        handleSeekEnd: seek.handleSeekEnd,
+        handleProgressClick: seek.handleProgressClick,
+        toggleFullscreen: controls.toggleFullscreen,
+        toggleWebFullscreen: controls.toggleWebFullscreen,
+        handleResolutionChange: settings.handleResolutionChange,
+        handleRateChange: settings.handleRateChange,
         handleSpeedHoldStart,
         handleSpeedHoldEnd,
         isSpeedHolding,
-        handleScaleChange,
-        handleBufferChange,
-        handleLock,
-        handleUnlock,
-        handleMouseMove,
-        handleVideoClick,
-        handleTouchStart,
-        handleTouchMove,
-        handleTouchEnd,
+        handleScaleChange: settings.handleScaleChange,
+        handleBufferChange: handleBufferChangeWired,
+        handleLock: settings.handleLock,
+        handleUnlock: settings.handleUnlock,
+        handleMouseMove: handleMouseMoveWired,
+        handleVideoClick: controls.handleVideoClick,
+        handleTouchStart: gestures.handleTouchStart,
+        handleTouchMove: gestures.handleTouchMove,
+        handleTouchEnd: handleTouchEndWired,
         formatTime,
     };
 }

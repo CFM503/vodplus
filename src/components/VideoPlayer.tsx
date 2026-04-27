@@ -1,6 +1,7 @@
 'use client';
 
-import { Loader2, Play, Pause, Sun, Volume2, FastForward } from 'lucide-react';
+import { useMemo } from 'react';
+import { Loader2, Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import VideoControls from '@/components/player/VideoControls';
@@ -22,25 +23,72 @@ interface VideoPlayerProps {
 export default function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl }: VideoPlayerProps) {
     const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl });
     const {
-        videoRef,
-        containerRef,
-        isPlaying,
-        isLoading,
-        isBuffering,
-        isHovering,
-        handleVideoClick,
-        handleMouseMove,
-        handleTouchStart,
-        handleTouchMove,
-        handleTouchEnd,
-        isLocked,
-        isEmbed,
-        brightness,
-        gestureHUD,
-        toast,
-        videoScale
+        videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
+        handleVideoClick, handleMouseMove, handleTouchStart, handleTouchMove,
+        handleTouchEnd, isLocked, isEmbed, brightness, gestureHUD, toast, videoScale,
     } = player;
 
+    // Memoized subset APIs for child components
+    const controlsApi = useMemo(() => ({
+        isPlaying: player.isPlaying,
+        togglePlay: player.togglePlay,
+        toggleMute: player.toggleMute,
+        isMuted: player.isMuted,
+        volume: player.volume,
+        handleVolumeChange: player.handleVolumeChange,
+        duration: player.duration,
+        videoRef: player.videoRef,
+        isLocked: player.isLocked,
+        handleLock: player.handleLock,
+        handleUnlock: player.handleUnlock,
+        showSettings: player.showSettings,
+        setShowSettings: player.setShowSettings,
+    }), [player.isPlaying, player.togglePlay, player.toggleMute, player.isMuted,
+        player.volume, player.handleVolumeChange, player.duration,
+        player.isLocked, player.handleLock, player.handleUnlock,
+        player.showSettings, player.setShowSettings]);
+
+    const progressApi = useMemo(() => ({
+        progress: player.progress,
+        duration: player.duration,
+        buffered: player.buffered,
+        isDragging: player.isDragging,
+        dragProgress: player.dragProgress,
+        progressBarRef: player.progressBarRef,
+        handleSeekStart: player.handleSeekStart,
+        handleSeekMove: player.handleSeekMove,
+        handleSeekEnd: player.handleSeekEnd,
+        handleProgressClick: player.handleProgressClick,
+    }), [player.progress, player.duration, player.buffered, player.isDragging,
+        player.dragProgress, player.handleSeekStart, player.handleSeekMove,
+        player.handleSeekEnd, player.handleProgressClick]);
+
+    const settingsApi = useMemo(() => ({
+        currentLevel: player.currentLevel,
+        levels: player.levels,
+        activeLevelIdx: player.activeLevelIdx,
+        playbackRate: player.playbackRate,
+        handleRateChange: player.handleRateChange,
+        videoScale: player.videoScale,
+        handleScaleChange: player.handleScaleChange,
+        maxBufferLength: player.maxBufferLength,
+        handleBufferChange: player.handleBufferChange,
+        handleResolutionChange: player.handleResolutionChange,
+        skipIntroTime: player.skipIntroTime,
+        handleSkipIntroChange: player.handleSkipIntroChange,
+    }), [player.currentLevel, player.levels, player.activeLevelIdx,
+        player.playbackRate, player.handleRateChange, player.videoScale,
+        player.handleScaleChange, player.maxBufferLength, player.handleBufferChange,
+        player.handleResolutionChange, player.handleSkipIntroChange]);
+
+    const buttonsApi = useMemo(() => ({
+        showSettings: player.showSettings,
+        setShowSettings: player.setShowSettings,
+        toggleFullscreen: player.toggleFullscreen,
+        toggleWebFullscreen: player.toggleWebFullscreen,
+        isWebFullscreen: player.isWebFullscreen,
+    }), [player.showSettings, player.setShowSettings, player.toggleFullscreen,
+        player.toggleWebFullscreen, player.isWebFullscreen]);
 
     if (isEmbed) {
         return (
@@ -58,134 +106,89 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     return (
         <div
             ref={containerRef}
-            className="relative w-full aspect-video bg-black rounded-xl overflow-hidden group touch-none select-none"
-            onMouseEnter={() => !isLocked && player.setIsHovering(true)}
+            className="relative w-full aspect-video bg-black select-none group rounded-xl overflow-hidden"
+            onMouseEnter={() => player.setIsHovering(true)}
+            onMouseLeave={() => player.setIsHovering(false)}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => !isLocked && player.setIsHovering(false)}
-            onClick={handleVideoClick}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onContextMenu={(e) => e.preventDefault()}
+            onClick={handleVideoClick}
         >
-            {/* Main Video Wrapper for Scaling */}
-            <div
-                className="w-full h-full absolute inset-0 bg-black flex items-center justify-center transition-transform duration-200 ease-out"
-                style={{
-                    transform: `scale(${videoScale})`
-                }}
-            >
-                <video
-                    ref={videoRef}
-                    poster={poster}
-                    className="w-full h-full object-contain"
-                    playsInline
-                    webkit-playsinline="true"
-                    x5-playsinline="true"
-                    x5-video-player-type="h5"
-                    x5-video-player-fullscreen="true"
-                    crossOrigin="anonymous"
-                    style={{
-                        filter: `brightness(${brightness}%)`
-                    }}
-                    preload="auto"
-                    suppressHydrationWarning
-                />
-            </div>
+            {/* Video Element */}
+            <video
+                ref={videoRef}
+                className="absolute inset-0 w-full h-full object-contain bg-black"
+                poster={poster}
+                playsInline
+                preload="metadata"
+                crossOrigin="anonymous"
+                style={!isLocked ? { transform: `scale(${videoScale})`, transformOrigin: 'center center' } : undefined}
+            />
 
-            {/* Brightness Overlay Removed - using CSS filter instead */}
+            {/* Loading Spinner */}
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30">
+                    <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
+                </div>
+            )}
+
+            {/* Buffering Spinner */}
+            {isBuffering && !isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
+                </div>
+            )}
+
+            {/* Single Click Overlay for Mobile (shown when controls hidden) */}
+            <div className="absolute inset-0 pointer-events-none z-5">
+                {!isHovering && !isPlaying && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <Play className="w-20 h-20 text-white/60 drop-shadow-lg" />
+                    </div>
+                )}
+            </div>
 
             {/* Gesture HUD */}
-            <div className={cn(
-                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-200 pointer-events-none",
-                gestureHUD.visible ? "opacity-100 scale-100" : "opacity-0 scale-90"
-            )}>
-                <div className={cn(
-                    "flex flex-col items-center gap-2 min-w-[120px]",
-                    gestureHUD.icon === 'seek'
-                        ? "drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
-                        : "bg-black/60 backdrop-blur-xl px-6 py-4 rounded-3xl border border-white/10"
-                )}>
-                    {gestureHUD.icon === 'volume' && <Volume2 className="w-8 h-8 text-white" />}
-                    {gestureHUD.icon === 'brightness' && <Sun className="w-8 h-8 text-white" />}
-                    {gestureHUD.icon === 'seek' && <FastForward className="w-10 h-10 text-white fill-white/20 animate-pulse" />}
-                    <span className="text-white font-bold text-lg">{gestureHUD.value}</span>
-                </div>
-            </div>
-
-            {/* Loading / Buffering Spinner */}
-            {(isLoading || isBuffering) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none gap-4">
-                    {/* Clean loading state without background box */}
-                    <div className="flex flex-col items-center gap-3 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
-                        <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
-                        <span className="text-white font-medium text-sm tracking-widest animate-pulse text-shadow-sm">
-                            {isLoading ? '正在加载...' : '正在缓冲...'}
-                        </span>
-                        {/* Buffering Progress */}
-                        {isBuffering && player.buffered > 0 && (
-                            <div className="flex items-center gap-2">
-                                <div className="w-32 h-1 bg-white/20 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-indigo-400 rounded-full transition-all duration-300"
-                                        style={{ width: `${player.buffered}%` }}
-                                    />
-                                </div>
-                                <span className="text-white/70 text-xs font-mono">
-                                    {Math.round(player.buffered)}%
-                                </span>
-                            </div>
-                        )}
+            {gestureHUD.visible && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                    <div className="bg-black/80 backdrop-blur-sm rounded-xl px-4 py-3 flex flex-col items-center gap-1 shadow-2xl border border-white/10">
+                        {gestureHUD.icon === 'volume' && <Volume2 className="w-8 h-8 text-white" />}
+                        {gestureHUD.icon === 'brightness' && <Volume2 className="w-8 h-8 text-yellow-400" />}
+                        {gestureHUD.icon === 'seek' && <Volume2 className="w-8 h-8 text-indigo-400" />}
+                        <span className="text-white text-base font-bold font-mono">{gestureHUD.value}</span>
                     </div>
                 </div>
             )}
 
-            {/* Controls Layer */}
-            <div className={cn(
-                "absolute inset-0 z-20 flex flex-col justify-end transition-opacity duration-300 pointer-events-none",
-                (isHovering || !isPlaying) ? "opacity-100 visible" : "opacity-0 invisible"
-            )}>
-                {/* Center play/pause button (Visible when config enabled AND HUD is active) */}
-                {(CONFIG.SHOW_CENTER_PLAY_BUTTON === 1 && !isLoading && !isBuffering) && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
-                        <button
-                            onTouchEnd={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                player.togglePlay();
-                            }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                player.togglePlay();
-                            }}
-                            className="bg-black/40 hover:bg-black/60 text-white p-5 rounded-full backdrop-blur-md border border-white/10 transition-all hover:scale-110 active:scale-95 shadow-2xl"
-                        >
-                            {isPlaying ? <Pause className="w-10 h-10 fill-white" /> : <Play className="w-10 h-10 fill-white ml-1" />}
-                        </button>
-                    </div>
-                )}
+            {/* Brightness Overlay */}
+            {brightness !== 100 && (
+                <div className="absolute inset-0 pointer-events-none z-[5]" style={{ backgroundColor: `rgba(0,0,0,${1 - brightness / 100})` }} />
+            )}
 
-                {/* Bottom Controls */}
-                {!isEmbed && (
-                    <VideoControls
-                        player={player}
-                        url={url}
-                        title={title}
-                        onPrevEpisode={onPrevEpisode}
-                        onNextEpisode={onNextEpisode}
-                        hasPrevEpisode={hasPrevEpisode}
-                        hasNextEpisode={hasNextEpisode}
-                    />
-                )}
-            </div>
-
-            {/* Toast Alerts */}
+            {/* Toast */}
             {toast.visible && (
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 duration-300">
-                    <div className="bg-black/80 backdrop-blur-xl border border-white/10 text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-2xl">
+                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all">
+                    <div className="bg-black/80 backdrop-blur-sm rounded-xl px-4 py-2 text-white text-sm shadow-2xl border border-white/10">
                         {toast.message}
                     </div>
                 </div>
+            )}
+
+            {/* Controls (conditionally rendered but always mounted when video is playing) */}
+            {isHovering && (
+                <VideoControls
+                    controlsApi={controlsApi}
+                    progressApi={progressApi}
+                    settingsApi={settingsApi}
+                    buttonsApi={buttonsApi}
+                    url={url}
+                    title={title}
+                    onPrevEpisode={onPrevEpisode}
+                    onNextEpisode={onNextEpisode}
+                    hasPrevEpisode={hasPrevEpisode}
+                    hasNextEpisode={hasNextEpisode}
+                />
             )}
         </div>
     );

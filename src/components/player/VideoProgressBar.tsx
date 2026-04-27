@@ -1,267 +1,174 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useVideoPlayer } from '@/hooks/useVideoPlayer';
+import { formatTime } from '@/lib/player-utils';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
 
-type PlayerState = ReturnType<typeof useVideoPlayer>;
+interface ProgressApi {
+    progress: number;
+    duration: number;
+    buffered: number;
+    isDragging: boolean;
+    dragProgress: number;
+    progressBarRef: React.RefObject<HTMLDivElement | null>;
+    handleSeekStart: (e: React.TouchEvent | React.MouseEvent) => void;
+    handleSeekMove: (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => void;
+    handleSeekEnd: () => void;
+    handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+}
 
 interface VideoProgressBarProps {
-    player: PlayerState;
+    progressApi: ProgressApi;
     url?: string;
     variant: 'desktop' | 'mobile';
     className?: string;
 }
 
-export default function VideoProgressBar({ player, url, variant, className }: VideoProgressBarProps) {
+export default function VideoProgressBar({ progressApi, url, variant, className }: VideoProgressBarProps) {
     const {
-        progress,
-        duration,
-        buffered,
-        isDragging,
-        dragProgress,
-        progressBarRef,
-        handleSeekStart,
-        handleSeekMove,
-        handleSeekEnd,
-        handleProgressClick,
-        formatTime,
-    } = player;
+        progress, duration, buffered, isDragging, dragProgress, progressBarRef,
+        handleSeekStart, handleSeekMove, handleSeekEnd, handleProgressClick,
+    } = progressApi;
 
     const [isHovering, setIsHovering] = useState(false);
     const [hoverProgress, setHoverProgress] = useState(0);
     const previewVideoRef = useRef<HTMLVideoElement>(null);
-    const localRef = useRef<HTMLDivElement>(null);
-
-    // Sync refs for the hook to work
-    const syncRef = () => {
-        if (localRef.current && progressBarRef) {
-            // @ts-ignore - assigning to readonly ref object usually works in React but better to use object assignment if possible, 
-            // or just assume progressBarRef is a MutableRefObject (it likely is from the hook).
-            (progressBarRef as React.MutableRefObject<HTMLDivElement | null>).current = localRef.current;
-        }
-    };
 
     // Calculate hover position
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!localRef.current) return;
-        const rect = localRef.current.getBoundingClientRect();
+        if (!progressBarRef.current) return;
+        const rect = progressBarRef.current.getBoundingClientRect();
         const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
         const percentage = (x / rect.width) * 100;
         setHoverProgress(percentage);
+    };
 
-        // Update Preview Video Time
-        if (previewVideoRef.current && duration) {
-            const targetTime = (percentage / 100) * duration;
-            if (Number.isFinite(targetTime)) {
+    const showTooltip = isHovering && duration > 0;
+    const canShowPreview = CONFIG.SHOW_THUMBNAIL_PREVIEW && url?.includes('.m3u8');
+
+    // HLS preview initialization (independent of hover state)
+    useEffect(() => {
+        if (!canShowPreview || !previewVideoRef.current || !url) return;
+
+        let cancelled = false;
+        const previewVideo = previewVideoRef.current;
+
+        const initPreview = async () => {
+            if (cancelled) return;
+            try {
+                const { default: Hls } = await import('hls.js');
+                if (cancelled || !Hls.isSupported() || !previewVideo) return;
+                const hls = new Hls({
+                    capLevelToPlayerSize: false,
+                    autoStartLoad: true,
+                    startLevel: -1,
+                    enableWorker: false,
+                    maxBufferLength: 30,
+                    manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
+                    manifestLoadingMaxRetry: 2,
+                    levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
+                    levelLoadingMaxRetry: 2,
+                    fragLoadingTimeOut: 10000,
+                    fragLoadingMaxRetry: 2,
+                    testBandwidth: false,
+                });
+                hls.loadSource(url);
+                hls.attachMedia(previewVideo);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (hls.levels.length > 0) hls.currentLevel = 0;
+                });
+
+                // Cleanup on effect re-run
+                return () => {
+                    hls.destroy();
+                };
+            } catch (err) {
+                logger.error('VideoProgressBar', 'Preview HLS init failed', err);
+            }
+        };
+
+        const cleanupHls = initPreview();
+        return () => {
+            cancelled = true;
+            if (cleanupHls instanceof Promise) {
+                cleanupHls.then(fn => fn?.());
+            }
+        };
+    }, [url, canShowPreview]);
+
+    // Update preview video time on hover
+    useEffect(() => {
+        if (canShowPreview && previewVideoRef.current && showTooltip && duration > 0) {
+            const targetTime = (hoverProgress / 100) * duration;
+            if (targetTime < previewVideoRef.current.duration) {
                 previewVideoRef.current.currentTime = targetTime;
             }
         }
-    };
+    }, [hoverProgress, showTooltip, duration, canShowPreview]);
 
-    // Desktop: Mouse Events
-    const desktopEvents = {
-        onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
-            syncRef();
-            handleSeekStart(e);
-        },
-        onClick: (e: React.MouseEvent<HTMLDivElement>) => {
-            syncRef();
-            handleProgressClick(e);
-        },
-        onMouseEnter: () => {
-            syncRef();
-            setIsHovering(true);
-        },
-        onMouseLeave: () => {
-            setIsHovering(false);
-            setHoverProgress(0);
-        },
-        onMouseMove: (e: React.MouseEvent<HTMLDivElement>) => {
-            // Ensure ref is synced just in case mouse entered without triggering enter (edge case)
-            if (progressBarRef.current !== localRef.current) syncRef();
-            handleMouseMove(e);
-        }
-    };
-
-    // Mobile: Touch Events
-    const mobileEvents = {
-        onTouchStart: (e: React.TouchEvent<HTMLDivElement>) => {
-            syncRef();
-            handleSeekStart(e);
-        },
-        onTouchMove: handleSeekMove, // Hook handles this, assuming ref is set correctly on start
-        onTouchEnd: handleSeekEnd,
-        onClick: (e: React.MouseEvent<HTMLDivElement>) => {
-            syncRef();
-            handleProgressClick(e);
-        },
-    };
-
-    const eventProps = variant === 'desktop' ? desktopEvents : mobileEvents;
-
-    // Visual Constants
-    const containerHeight = variant === 'mobile' ? 16 : 14;
-
-    // Time to display in tooltip
-    const tooltipTime = isDragging
-        ? (dragProgress / 100) * duration
-        : (hoverProgress / 100) * duration;
-
-    // Also sync preview video during drag
-    if (isDragging && previewVideoRef.current && duration) {
-        previewVideoRef.current.currentTime = tooltipTime;
-    }
-
-    // Position for tooltip
-    const rawPos = isDragging ? dragProgress : hoverProgress;
-    const tooltipPos = Math.max(0, Math.min(100, rawPos));
-
-    // Check validation - Relaxed for functionality
-    const showTooltip = (isDragging || (isHovering && variant === 'desktop'));
-
-    // Determines if we can show a video preview - Enable for all, try to handle HLS
-    // Now controlled by Config
-    const canShowPreview = !!url && CONFIG.SHOW_THUMBNAIL_PREVIEW;
-
-    // HLS Integration for Preview
-    useEffect(() => {
-        if (!canShowPreview || !previewVideoRef.current || !url.includes('.m3u8')) return;
-
-        let hls: any = null;
-
-        const initHls = async () => {
-            try {
-                const { default: Hls } = await import('hls.js');
-                if (Hls.isSupported()) {
-                    hls = new Hls({
-                        enableWorker: true,
-                        // Optimize for thumbnails:
-                        startLevel: 0, // Start with lowest quality
-                        autoStartLoad: true,
-                        capLevelToPlayerSize: true, // Limit quality based on tiny video size
-                    });
-
-                    hls.loadSource(url);
-                    hls.attachMedia(previewVideoRef.current);
-
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        // Force lowest level to save bandwidth
-                        if (hls.levels.length > 0) {
-                            hls.currentLevel = 0;
-                        }
-                    });
-                } else if (previewVideoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
-                    // Native HLS (Safari)
-                    previewVideoRef.current.src = url;
-                }
-            } catch (e) {
-                logger.error('VideoProgressBar', 'HLS init for preview failed', e);
-            }
-        };
-
-        initHls();
-
-        return () => {
-            if (hls) {
-                hls.destroy();
-            }
-        };
-    }, [url, showTooltip, canShowPreview]); // Re-run when tooltip visibility changes (mounts/unmounts)
+    const displayProgress = isDragging ? dragProgress : progress;
 
     return (
         <div
+            ref={progressBarRef}
             className={cn(
-                "w-full flex items-center relative group/progress select-none touch-none",
-                variant === 'mobile' ? "px-0" : "cursor-pointer mx-0",
-                isDragging ? "cursor-grabbing" : "",
+                "relative cursor-pointer group",
+                variant === 'desktop' ? "h-8 -mx-2 px-2" : "h-6 -mx-1 px-1",
                 className
             )}
-            style={{
-                height: `${containerHeight}px`,
-                // Make sure we have a wide hit area
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => { setIsHovering(false); setHoverProgress(0); }}
+            onMouseMove={(e) => {
+                handleMouseMove(e);
+                handleSeekMove(e as any);
             }}
-            ref={localRef}
-            {...eventProps}
+            onClick={handleProgressClick}
+            onTouchStart={handleSeekStart}
+            onTouchMove={handleSeekMove}
+            onTouchEnd={handleSeekEnd}
         >
-            {/* Hover Tooltip & Thumbnail */}
-            {showTooltip && (
-                <div
-                    className="absolute z-[100] flex flex-col items-center gap-2 pointer-events-none"
-                    style={{
-                        left: `${tooltipPos}%`,
-                        transform: `translateX(${tooltipPos < 10 ? '0%' : tooltipPos > 90 ? '-100%' : '-50%'})`,
-                        // Ensure precise alignment
-                        bottom: '20px',
-                    }}
-                >
-                    {/* Thumbnail Preview Window - Only render if available */}
-                    {canShowPreview && (
-                        <div className="relative w-40 aspect-video bg-black rounded-lg overflow-hidden border-2 border-white/20 shadow-2xl flex items-center justify-center bg-black">
-                            <video
-                                ref={previewVideoRef}
-                                src={!url?.includes('.m3u8') ? url : undefined} // Only set src directly for non-HLS
-                                className="w-full h-full object-cover"
-                                muted
-                                preload="auto"
-                                playsInline
-                                crossOrigin="anonymous"
-                            />
-                        </div>
-                    )}
-
-                    {/* Time Display */}
-                    <div className="px-2 py-0.5 text-white text-[13px] font-bold drop-shadow-md bg-black/60 backdrop-blur-md rounded border border-white/10">
-                        {Number.isFinite(tooltipTime) ? formatTime(tooltipTime) : '00:00'}
-                    </div>
-                </div>
-            )}
-
-            {/* Track Background (The visible bar container) */}
-            <div
-                className={cn(
-                    "w-full relative bg-white/20 transition-all duration-100 ease-out origin-left",
-                    // Reset rounding to be subtler or square-ish like YouTube? YouTube is square. Let's keep slight round for modern feel.
-                    "rounded-sm"
+            {/* Progress bar track */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full">
+                {/* Buffered */}
+                {buffered > 0 && (
+                    <div className="absolute h-full bg-white/30 rounded-full" style={{ width: `${buffered}%` }} />
                 )}
-                style={{
-                    height: (isHovering || isDragging) ? `${CONFIG.PROGRESS_BAR_HEIGHT + 2}px` : `${CONFIG.PROGRESS_BAR_HEIGHT}px`,
-                }}
-            >
-                {/* Buffered Bar - Enhanced with smooth transition and better visibility */}
-                <div
-                    className="absolute left-0 top-0 h-full bg-white/30 transition-all duration-300 ease-out"
-                    style={{ width: `${buffered}%` }}
-                />
-
-                {/* Played Bar (Red) */}
+                {/* Progress */}
                 <div
                     className={cn(
-                        "absolute left-0 top-0 h-full z-10",
-                        !isDragging && "transition-all duration-100 linear"
+                        "absolute h-full rounded-full transition-[width] duration-150 ease-linear",
+                        isDragging ? "bg-indigo-400" : "bg-indigo-500 group-hover:bg-indigo-400"
                     )}
-                    style={{
-                        width: `${isDragging ? dragProgress : progress}%`,
-                        backgroundColor: CONFIG.PROGRESS_BAR_COLOR
-                    }}
+                    style={{ width: `${displayProgress}%` }}
                 />
-
-                {/* Scrubber Handle (The Dot) */}
+                {/* Scrubber dot */}
                 <div
                     className={cn(
-                        "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-100 ease-out z-20 shadow-md",
-                        variant === 'desktop'
-                            ? (isHovering || isDragging ? "opacity-100 scale-100" : "opacity-0 scale-0")
-                            : "" // Mobile always show
+                        "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full transition-all",
+                        isDragging ? "scale-125 bg-indigo-300 shadow-glow" : "bg-white scale-100 opacity-0 group-hover:opacity-100"
                     )}
-                    style={{
-                        left: `${isDragging ? dragProgress : progress}%`,
-                        backgroundColor: CONFIG.PROGRESS_BAR_HANDLE_COLOR,
-                        width: `${CONFIG.PROGRESS_BAR_HEIGHT + CONFIG.PROGRESS_BAR_HANDLE_SIZE_ADD}px`,
-                        height: `${CONFIG.PROGRESS_BAR_HEIGHT + CONFIG.PROGRESS_BAR_HANDLE_SIZE_ADD}px`,
-                    }}
+                    style={{ left: `${displayProgress}%` }}
                 />
             </div>
+
+            {/* Hover tooltip */}
+            {showTooltip && (
+                <div
+                    className="absolute bottom-full mb-2 -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap z-40"
+                    style={{ left: `${hoverProgress}%` }}
+                >
+                    {formatTime(duration * (hoverProgress / 100))} / {formatTime(duration)}
+                    {canShowPreview && (
+                        <video
+                            ref={previewVideoRef}
+                            className="block w-40 h-auto mt-1 rounded"
+                            muted
+                            playsInline
+                            preload="none"
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }

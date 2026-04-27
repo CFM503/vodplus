@@ -81,6 +81,16 @@ export const CONFIG = {
     // 网络差时建议调大
     HLS_TIMEOUT: 10000,
 
+    // 播放卡死检测阈值 (毫秒)
+    // waiting 状态持续超过此时间，触发跳过恢复
+    STALL_THRESHOLD_MS: 8000,
+
+    // 卡死时跳过秒数
+    STALL_SKIP_SECONDS: 5,
+
+    // 最大连续跳过次数，超过后提示用户切换线路
+    MAX_STALL_SKIPS: 5,
+
     // API 数据缓存时间 (秒)
     // 控制首页/详情页数据在边缘节点缓存多久，减少重复请求。
     // 0: 不缓存；300: 缓存5分钟 (默认)
