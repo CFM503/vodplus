@@ -11,85 +11,39 @@ interface UseVideoSeekProps {
 }
 
 export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, setProgress: setProgressProp }: UseVideoSeekProps) {
+    // isDragging is exposed so external code (e.g. controls hide timer) knows we're dragging
     const [isDragging, setIsDragging] = useState(false);
     const [dragProgress, setDragProgress] = useState(0);
-
-    const isDraggingRef = useRef(false);
-    const dragProgressRef = useRef(0);
-    const progressRectRef = useRef<DOMRect | null>(null);
-    const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSeekEndTimeRef = useRef(0);
 
-    // Sync state to refs for stable callbacks
-    useEffect(() => {
-        isDraggingRef.current = isDragging;
-    }, [isDragging]);
-
-    const calculatePosition = useCallback((clientX: number, rect: DOMRect) => {
-        return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    }, []);
-
-    // Progress bar rect cache
-    useEffect(() => {
-        const updateRect = () => {
-            if (progressBarRef.current) {
-                progressRectRef.current = progressBarRef.current.getBoundingClientRect();
-            }
-        };
-        updateRect();
-        window.addEventListener('resize', updateRect);
-        window.addEventListener('fullscreenchange', updateRect);
-        return () => {
-            window.removeEventListener('resize', updateRect);
-            window.removeEventListener('fullscreenchange', updateRect);
-        };
-    }, []);
-
     /**
-     * handleSeekStart: Called when pointer goes down on the progress bar.
-     * Sets up drag state and records initial position.
+     * Called by the progress bar component when drag starts.
      */
-    const handleSeekStart = useCallback((clientX: number) => {
-        if (!progressBarRef.current || !videoRef.current) return;
-        const rect = progressBarRef.current.getBoundingClientRect();
-        progressRectRef.current = rect;
-
-        if (rect.width === 0) return;
-
-        const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-
-        setDragProgress(percent);
-        dragProgressRef.current = percent;
-        isDraggingRef.current = true;
+    const handleSeekStart = useCallback((percent: number) => {
         setIsDragging(true);
-    }, []);
-
-    /**
-     * handleSeekMove: Called when pointer moves while dragging.
-     * Updates the drag progress percentage.
-     */
-    const handleSeekMove = useCallback((clientX: number) => {
-        if (!isDraggingRef.current || !progressRectRef.current) return;
-        const rect = progressRectRef.current;
-        const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
         setDragProgress(percent);
-        dragProgressRef.current = percent;
     }, []);
 
     /**
-     * handleSeekEnd: Called when pointer is released.
-     * Seeks the video to the drag position and resumes playback.
+     * Called by the progress bar component when drag moves.
      */
-    const handleSeekEnd = useCallback(() => {
-        if (!isDraggingRef.current) return;
+    const handleSeekMove = useCallback((percent: number) => {
+        setDragProgress(percent);
+    }, []);
+
+    /**
+     * Called by the progress bar component when drag ends.
+     * Performs the actual video seek and resumes playback.
+     */
+    const handleSeekEnd = useCallback((percent: number) => {
         const video = videoRef.current;
-        const finalProgress = dragProgressRef.current;
 
         if (video && video.duration) {
-            const targetTime = (finalProgress / 100) * video.duration;
+            const targetTime = (percent / 100) * video.duration;
             if (Number.isFinite(targetTime)) {
                 video.currentTime = targetTime;
-                if (setProgressProp) setProgressProp(finalProgress);
+                // Immediately update progress state so knob doesn't jump back
+                if (setProgressProp) setProgressProp(percent);
             }
 
             // Resume playback after seeking
@@ -99,30 +53,35 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
                 });
             }
 
-            if (hlsRef.current && video.paused && !video.ended) {
-                seekTimeoutRef.current = setTimeout(() => {
+            if (hlsRef.current) {
+                setTimeout(() => {
                     if (hlsRef.current && video.paused) hlsRef.current.startLoad();
                 }, 100);
             }
         }
+
         setIsDragging(false);
         setDragProgress(0);
-        dragProgressRef.current = 0;
-        progressRectRef.current = null;
         lastSeekEndTimeRef.current = Date.now();
-    }, [setProgressProp]);
+    }, [setProgressProp, videoRef, hlsRef]);
 
+    /**
+     * Click on the progress bar (non-drag click).
+     */
     const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
 
         const video = videoRef.current;
-        if (!video || isDraggingRef.current) return;
+        if (!video) return;
 
-        // Suppress click that fires after a drag ends (pointerup → click)
+        // Suppress click that fires right after a drag ends
         if (Date.now() - lastSeekEndTimeRef.current < CONFIG.SEEK_CLICK_SUPPRESSION_DELAY) return;
 
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pos = calculatePosition(e.clientX, rect);
+        if (!progressBarRef.current) return;
+        const rect = progressBarRef.current.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
         if (video.duration) {
             const targetTime = pos * video.duration;
             if (Number.isFinite(targetTime)) {
@@ -130,7 +89,7 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
                 if (setProgressProp) setProgressProp(pos * 100);
             }
         }
-    }, [calculatePosition, setProgressProp]);
+    }, [setProgressProp, videoRef, progressBarRef]);
 
     return {
         isDragging,

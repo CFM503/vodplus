@@ -121,9 +121,9 @@ export interface UseVideoSeekOutput {
     dragProgress: number;
     progressBarRef: RefObject<HTMLDivElement | null>;
     lastSeekEndTimeRef: { current: number };
-    handleSeekStart: (e: React.TouchEvent | React.MouseEvent) => void;
-    handleSeekMove: (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => void;
-    handleSeekEnd: () => void;
+    handleSeekStart: (percent: number) => void;
+    handleSeekMove: (percent: number) => void;
+    handleSeekEnd: (percent: number) => void;
     handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
@@ -232,9 +232,9 @@ export interface ProgressApi {
     isDragging: boolean;
     dragProgress: number;
     progressBarRef: RefObject<HTMLDivElement | null>;
-    handleSeekStart: (e: React.TouchEvent | React.MouseEvent) => void;
-    handleSeekMove: (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => void;
-    handleSeekEnd: () => void;
+    handleSeekStart: (percent: number) => void;
+    handleSeekMove: (percent: number) => void;
+    handleSeekEnd: (percent: number) => void;
     handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
@@ -307,9 +307,9 @@ export interface PlayerAPI {
     togglePlay: () => void;
     toggleMute: () => void;
     handleVolumeChange: (newVolume: number) => void;
-    handleSeekStart: (e: React.TouchEvent | React.MouseEvent) => void;
-    handleSeekMove: (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => void;
-    handleSeekEnd: () => void;
+    handleSeekStart: (percent: number) => void;
+    handleSeekMove: (percent: number) => void;
+    handleSeekEnd: (percent: number) => void;
     handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
     toggleFullscreen: () => void;
     toggleWebFullscreen: () => void;

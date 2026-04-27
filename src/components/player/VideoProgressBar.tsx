@@ -1,24 +1,10 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { formatTime } from '@/lib/player-utils';
-import { CONFIG } from '@/config/config';
-
-interface ProgressApi {
-    progress: number;
-    duration: number;
-    buffered: number;
-    isDragging: boolean;
-    dragProgress: number;
-    progressBarRef: React.RefObject<HTMLDivElement | null>;
-    handleSeekStart: (clientX: number) => void;
-    handleSeekMove: (clientX: number) => void;
-    handleSeekEnd: () => void;
-    handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-}
 
 interface VideoProgressBarProps {
     player?: any;
-    progressApi?: ProgressApi;
+    progressApi?: any;
     url?: string;
     variant: 'desktop' | 'mobile';
     className?: string;
@@ -29,100 +15,94 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
 
     if (!api) return null;
 
-    const progress = api.progress ?? 0;
-    const duration = api.duration ?? 0;
-    const buffered = api.buffered ?? 0;
+    const progress: number = api.progress ?? 0;
+    const duration: number = api.duration ?? 0;
+    const buffered: number = api.buffered ?? 0;
     const progressBarRef = api.progressBarRef;
-    const handleSeekStart = api.handleSeekStart;
-    const handleSeekMove = api.handleSeekMove;
-    const handleSeekEnd = api.handleSeekEnd;
-    const handleProgressClick = api.handleProgressClick;
+    const handleSeekStart: (percent: number) => void = api.handleSeekStart;
+    const handleSeekMove: (percent: number) => void = api.handleSeekMove;
+    const handleSeekEnd: (percent: number) => void = api.handleSeekEnd;
+    const handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void = api.handleProgressClick;
+
+    // Ref for the actual visual track (the thin bar), used for precise position calculation
+    const trackRef = useRef<HTMLDivElement>(null);
 
     // Local drag state — single source of truth for drag UI
     const [isDragging, setIsDragging] = useState(false);
     const [dragPercent, setDragPercent] = useState(0);
     const isDraggingRef = useRef(false);
+    const dragPercentRef = useRef(0);
 
     const [isHovering, setIsHovering] = useState(false);
     const [hoverProgress, setHoverProgress] = useState(0);
 
-    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
-
-    const getPercentFromEvent = useCallback((e: React.PointerEvent | PointerEvent) => {
-        if (!progressBarRef?.current) return 0;
-        const rect = progressBarRef.current.getBoundingClientRect();
+    /**
+     * Calculate percentage from clientX using the track element's bounding rect.
+     * This ensures the percentage matches exactly with the visual position of the knob.
+     */
+    const getPercentFromClientX = useCallback((clientX: number): number => {
+        const el = trackRef.current;
+        if (!el) return 0;
+        const rect = el.getBoundingClientRect();
         if (rect.width === 0) return 0;
-        return clamp(((e.clientX - rect.left) / rect.width) * 100, 0, 100);
-    }, [progressBarRef]);
+        const x = clientX - rect.left;
+        return Math.max(0, Math.min(100, (x / rect.width) * 100));
+    }, []);
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!progressBarRef?.current) return;
-        const rect = progressBarRef.current.getBoundingClientRect();
-        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-        const percentage = (x / rect.width) * 100;
-        setHoverProgress(percentage);
+        setHoverProgress(getPercentFromClientX(e.clientX));
     };
 
-    /**
-     * Pointer down — start dragging.
-     * We set local state AND call into the seek hook so it records the start position.
-     */
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
-        if (!progressBarRef?.current) return;
-        // Capture pointer so we get move/up even if finger leaves the element
-        try { (progressBarRef.current as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+        // Capture pointer so move/up events continue even if finger leaves element
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
 
-        const percent = getPercentFromEvent(e);
+        const percent = getPercentFromClientX(e.clientX);
         setIsDragging(true);
         isDraggingRef.current = true;
         setDragPercent(percent);
+        dragPercentRef.current = percent;
         setHoverProgress(percent);
 
-        // Notify the seek hook
-        handleSeekStart(e.clientX);
+        handleSeekStart(percent);
 
         e.stopPropagation();
         if (e.cancelable) e.preventDefault();
-    }, [getPercentFromEvent, handleSeekStart, progressBarRef]);
+    }, [getPercentFromClientX, handleSeekStart]);
 
-    /**
-     * Pointer move — update drag position.
-     */
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
         if (!isDraggingRef.current) return;
 
-        const percent = getPercentFromEvent(e);
+        const percent = getPercentFromClientX(e.clientX);
         setDragPercent(percent);
+        dragPercentRef.current = percent;
         setHoverProgress(percent);
 
-        // Notify the seek hook
-        handleSeekMove(e.clientX);
+        handleSeekMove(percent);
 
         e.stopPropagation();
-    }, [getPercentFromEvent, handleSeekMove]);
+    }, [getPercentFromClientX, handleSeekMove]);
 
-    /**
-     * Pointer up — commit the seek.
-     */
     const handlePointerUp = useCallback((e: React.PointerEvent) => {
         if (!isDraggingRef.current) return;
 
+        const finalPercent = dragPercentRef.current;
         isDraggingRef.current = false;
         setIsDragging(false);
         setIsHovering(false);
         setHoverProgress(0);
 
-        // Notify the seek hook to perform the actual video seek
-        handleSeekEnd();
+        // Pass the final percentage so the hook seeks the video
+        handleSeekEnd(finalPercent);
 
-        try { progressBarRef?.current?.releasePointerCapture(e.pointerId); } catch {}
+        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
         e.stopPropagation();
-    }, [handleSeekEnd, progressBarRef]);
+    }, [handleSeekEnd]);
 
     // During drag, show the local drag percentage; otherwise show real playback progress
     const displayProgress = isDragging ? dragPercent : progress;
 
-    // Show tooltip/time during hover or drag
+    // Show tooltip during hover or drag
     const showTooltip = duration > 0 && (isDragging || isHovering);
 
     return (
@@ -137,7 +117,6 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => { setIsHovering(false); setHoverProgress(0); }}
             onMouseMove={handleMouseMove}
-            // Block touch events from bubbling to container's gesture handler.
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
             onTouchEnd={(e) => e.stopPropagation()}
@@ -150,29 +129,36 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
         >
-            {/* Track background */}
-            <div className={cn(
-                "absolute left-0 right-0 h-2 bg-white/20 rounded-full",
-                variant === 'desktop' ? "top-1/2 -translate-y-1/2" : "top-1/2 -translate-y-1/2"
-            )}>
+            {/* Track — this is the visual bar; we use trackRef for position calculation */}
+            <div
+                ref={trackRef}
+                className={cn(
+                    "absolute left-0 right-0 h-2 bg-white/20 rounded-full",
+                    "top-1/2 -translate-y-1/2"
+                )}
+            >
                 {/* Buffered bar */}
                 {buffered > 0 && (
-                    <div className="absolute h-full bg-white/30 rounded-full" style={{ width: `${buffered}%` }} />
+                    <div
+                        className="absolute h-full bg-white/30 rounded-full"
+                        style={{ width: `${buffered}%` }}
+                    />
                 )}
-                {/* Played/progress bar */}
+                {/* Played bar */}
                 <div
                     className={cn(
                         "absolute h-full rounded-full",
-                        isDragging
-                            ? "bg-indigo-400"
-                            : "bg-indigo-500 group-hover:bg-indigo-400"
+                        isDragging ? "bg-indigo-400" : "bg-indigo-500 group-hover:bg-indigo-400"
                     )}
-                    style={{ width: `${displayProgress}%`, transition: isDragging ? 'none' : 'width 150ms linear' }}
+                    style={{
+                        width: `${displayProgress}%`,
+                        transition: isDragging ? 'none' : 'width 150ms linear',
+                    }}
                 />
                 {/* Knob / thumb */}
                 <div
                     className={cn(
-                        "absolute top-1/2 rounded-full",
+                        "absolute top-1/2 rounded-full pointer-events-none",
                         variant === 'mobile'
                             ? "bg-white w-5 h-5 opacity-100"
                             : isDragging
