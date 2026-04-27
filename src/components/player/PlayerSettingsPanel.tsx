@@ -135,10 +135,11 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                     {[
-                        { label: '极速', value: 10 },
-                        { label: '平衡', value: 30 },
-                        { label: '流畅', value: 60 },
-                        { label: '超级流畅', value: 120 },
+                        { label: '10s', value: 10 },
+                        { label: '30s', value: 30 },
+                        { label: '60s', value: 60 },
+                        { label: '120s', value: 120 },
+                        { label: '180s', value: 180 },
                     ].map(({ label, value }) => (
                         <button
                             key={value}

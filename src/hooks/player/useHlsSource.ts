@@ -144,8 +144,8 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
     // Update HLS buffer config dynamically
     useEffect(() => {
         if (hlsRef.current && !isEmbed) {
-            hlsRef.current.config.maxBufferLength = maxBufferLength;
-            hlsRef.current.config.maxMaxBufferLength = maxBufferLength * 2;
+            (hlsRef.current.config as any).maxBufferLength = maxBufferLength;
+            (hlsRef.current.config as any).maxMaxBufferLength = maxBufferLength * 2;
         }
     }, [maxBufferLength, isEmbed]);
 

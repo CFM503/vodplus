@@ -13,11 +13,14 @@ interface UseVideoSettingsProps {
     videoScale: number;
     setVideoScale: (scale: number) => void;
     showToast: (message: string) => void;
+    maxBufferLength: number;
+    setMaxBufferLength: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export function useVideoSettings({
     hlsRef, isEmbed, skipIntroTimeRef, videoRef,
     playbackRate, setPlaybackRate, videoScale, setVideoScale, showToast,
+    maxBufferLength, setMaxBufferLength,
 }: UseVideoSettingsProps) {
     const [showSettings, setShowSettings] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
@@ -45,8 +48,9 @@ export function useVideoSettings({
     const handleBufferChange = useCallback((buf: number) => {
         const label = buf === 10 ? '极速' : buf === 30 ? '平衡' : buf === 60 ? '流畅' : buf === 120 ? '抗断网' : '超级流畅';
         showToast(`缓存策略已更新：${label}模式 (${buf}s)`);
+        setMaxBufferLength(buf);
         setShowSettings(false);
-    }, [showToast]);
+    }, [showToast, setMaxBufferLength]);
 
     const handleSkipIntroChange = useCallback((seconds: number) => {
         const next = Math.max(0, seconds);

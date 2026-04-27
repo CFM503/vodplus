@@ -128,7 +128,7 @@ export default function VideoProgressBar({ progressApi, url, variant, className 
             onTouchEnd={handleSeekEnd}
         >
             {/* Progress bar track */}
-            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full">
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-2 bg-white/20 rounded-full">
                 {/* Buffered */}
                 {buffered > 0 && (
                     <div className="absolute h-full bg-white/30 rounded-full" style={{ width: `${buffered}%` }} />

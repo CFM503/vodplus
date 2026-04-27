@@ -129,6 +129,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         videoScale,
         setVideoScale,
         showToast,
+        maxBufferLength,
+        setMaxBufferLength,
     });
 
     // 2.5 Playback Health (stall detection + auto-skip)
