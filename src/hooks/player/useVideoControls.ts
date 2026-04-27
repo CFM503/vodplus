@@ -88,10 +88,7 @@ export function useVideoControls({
     useEffect(() => {
         let timeout: NodeJS.Timeout;
 
-        const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
-        const shouldAutoHide = CONFIG.AUTO_HIDE_CONTROLS || isTouchDevice;
-
-        if (shouldAutoHide && isPlaying && isHovering && !isDragging && !showSettings) {
+        if (CONFIG.AUTO_HIDE_CONTROLS && isPlaying && isHovering && !isDragging && !showSettings) {
             timeout = setTimeout(() => setIsHovering(false), CONFIG.CONTROLS_AUTO_HIDE_TIME);
         }
         return () => clearTimeout(timeout);

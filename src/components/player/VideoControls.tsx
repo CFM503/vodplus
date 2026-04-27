@@ -3,6 +3,7 @@
 import React from 'react';
 import { Play, Pause, Volume2, VolumeX, Unlock, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { formatTime } from '@/lib/player-utils';
 import { CONFIG } from '@/config/config';
 import VideoProgressBar from './VideoProgressBar';
@@ -10,55 +11,10 @@ import EpisodeControls from './EpisodeControls';
 import ControlButtons from './ControlButtons';
 import PlayerSettingsPanel from './PlayerSettingsPanel';
 
+type PlayerState = ReturnType<typeof useVideoPlayer>;
+
 interface VideoControlsProps {
-    controlsApi: {
-        isPlaying: boolean;
-        togglePlay: () => void;
-        toggleMute: () => void;
-        isMuted: boolean;
-        volume: number;
-        handleVolumeChange: (v: number) => void;
-        duration: number;
-        videoRef: React.RefObject<HTMLVideoElement | null>;
-        isLocked: boolean;
-        handleLock: () => void;
-        handleUnlock: () => void;
-        showSettings: boolean;
-        setShowSettings: (v: boolean) => void;
-    };
-    progressApi: {
-        progress: number;
-        duration: number;
-        buffered: number;
-        isDragging: boolean;
-        dragProgress: number;
-        progressBarRef: React.RefObject<HTMLDivElement | null>;
-        handleSeekStart: (e: React.TouchEvent | React.MouseEvent) => void;
-        handleSeekMove: (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => void;
-        handleSeekEnd: () => void;
-        handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-    };
-    settingsApi: {
-        currentLevel: number;
-        levels: { height: number; index: number }[];
-        activeLevelIdx: number;
-        playbackRate: number;
-        handleRateChange: (rate: number) => void;
-        videoScale: number;
-        handleScaleChange: (scale: number) => void;
-        maxBufferLength: number;
-        handleBufferChange: (buf: number) => void;
-        handleResolutionChange: (idx: number) => void;
-        skipIntroTime: React.RefObject<number>;
-        handleSkipIntroChange: (seconds: number) => void;
-    };
-    buttonsApi: {
-        showSettings: boolean;
-        setShowSettings: (v: boolean) => void;
-        toggleFullscreen: () => void;
-        toggleWebFullscreen: () => void;
-        isWebFullscreen: boolean;
-    };
+    player: PlayerState;
     url: string;
     title?: string;
     onPrevEpisode?: () => void;
@@ -68,10 +24,31 @@ interface VideoControlsProps {
 }
 
 const VideoControls = React.memo(function VideoControls({
-    controlsApi, progressApi, settingsApi, buttonsApi, url, title,
-    onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode,
+    player,
+    url,
+    title,
+    onPrevEpisode,
+    onNextEpisode,
+    hasPrevEpisode,
+    hasNextEpisode
 }: VideoControlsProps) {
-    const { isPlaying, togglePlay, toggleMute, isMuted, volume, handleVolumeChange, duration, videoRef, isLocked, handleLock, handleUnlock, showSettings, setShowSettings } = controlsApi;
+    const {
+        isPlaying,
+        togglePlay,
+        toggleMute,
+        isMuted,
+        volume,
+        handleVolumeChange,
+        duration,
+        formatTime,
+        videoRef,
+        progress,
+        isLocked,
+        handleLock,
+        handleUnlock,
+        showSettings,
+        setShowSettings,
+    } = player;
 
     return (
         <>
@@ -135,75 +112,142 @@ const VideoControls = React.memo(function VideoControls({
                 {/* Mobile layout */}
                 <div className="flex md:hidden flex-col p-2 pb-3 gap-0.5">
                     <div className="px-1">
-                        <VideoProgressBar progressApi={progressApi} variant="mobile" />
+                        <VideoProgressBar player={player} url={url} variant="mobile" />
                     </div>
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-0.5 min-w-0">
-                            <ControlButtons buttonsApi={buttonsApi} variant="mobile" />
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <EpisodeControls onPrevEpisode={onPrevEpisode} onNextEpisode={onNextEpisode} hasPrevEpisode={hasPrevEpisode} hasNextEpisode={hasNextEpisode} variant="mobile" />
+                    <div className="flex items-center justify-between text-white gap-1 h-10">
+                        <div className="flex items-center gap-1 shrink-0 min-w-0">
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); togglePlay(); }}
-                                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                className="w-10 h-10 flex items-center justify-center bg-indigo-600 rounded-full text-white active:scale-90 transition-all"
+                                onTouchEnd={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    togglePlay();
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePlay();
+                                }}
+                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                             >
-                                {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white translate-x-px" />}
+                                {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
                             </button>
+
+                            <EpisodeControls
+                                onPrevEpisode={onPrevEpisode}
+                                onNextEpisode={onNextEpisode}
+                                hasPrevEpisode={hasPrevEpisode}
+                                hasNextEpisode={hasNextEpisode}
+                                variant="mobile"
+                            />
+
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); toggleMute(); }}
-                                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                                className="p-2 rounded-full hover:bg-white/10 active:scale-95 transition-all"
+                                onTouchEnd={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    toggleMute();
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleMute();
+                                }}
+                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
+                                title={isMuted ? "取消静音" : "静音"}
                             >
-                                {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+                                {isMuted ? <VolumeX className="w-5 h-5 text-indigo-400" /> : <Volume2 className="w-5 h-5 text-white" />}
                             </button>
+
+                            <span className="text-[10px] font-mono whitespace-nowrap opacity-80 ml-1 shrink-0">
+                                {formatTime(duration * (progress / 100))} / {formatTime(duration)}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center shrink-0">
+                            <ControlButtons player={player} variant="mobile" />
                         </div>
                     </div>
-                    <div className="text-white/60 text-[10px] text-center font-mono -mt-0.5">
-                        {formatTime(duration * (progressApi.progress / 100))} / {formatTime(duration)}
-                    </div>
+
+                    {/* Mobile Settings Modal */}
+                    {showSettings && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in"
+                                onClick={() => setShowSettings(false)}
+                            />
+                            <div
+                                className="relative z-10 w-full max-w-xs animate-in zoom-in-95 duration-200"
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onTouchMove={(e) => e.stopPropagation()}
+                                onTouchEnd={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <PlayerSettingsPanel
+                                    player={player}
+                                    onClose={() => setShowSettings(false)}
+                                    className="max-h-[80vh] overflow-y-auto w-full"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Desktop layout */}
                 <div className="hidden md:flex flex-col p-4 pb-3 gap-1">
-                    <VideoProgressBar progressApi={progressApi} variant="desktop" />
+                    <VideoProgressBar player={player} url={url} variant="desktop" />
                     <div className="flex items-center gap-3">
                         <button onClick={(e) => { e.stopPropagation(); togglePlay(); }} className="p-1.5 hover:text-indigo-400 active:scale-90 transition-all" title={isPlaying ? 'Pause' : 'Play'}>
                             {isPlaying ? <Pause className="w-8 h-8 text-white fill-white" /> : <Play className="w-8 h-8 text-white fill-white translate-x-px" />}
                         </button>
-                        <div className="group flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                            <button onClick={(e) => { e.stopPropagation(); toggleMute(); }} className="p-1 hover:text-indigo-400 transition-colors">
-                                {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+
+                        <EpisodeControls
+                            onPrevEpisode={onPrevEpisode}
+                            onNextEpisode={onNextEpisode}
+                            hasPrevEpisode={hasPrevEpisode}
+                            hasNextEpisode={hasNextEpisode}
+                            variant="desktop"
+                        />
+
+                        {/* Volume Slider */}
+                        <div className="flex items-center gap-2 group/volume relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleMute();
+                                }}
+                                className="hover:scale-110 transition-transform"
+                            >
+                                {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                             </button>
-                            <input
-                                type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume}
-                                onChange={(e) => { e.stopPropagation(); handleVolumeChange(parseFloat(e.target.value)); }}
-                                className="w-0 group-hover:w-24 focus:w-24 transition-all duration-200 accent-indigo-400 cursor-pointer h-1"
-                            />
+                            <div className="w-0 overflow-hidden group-hover/volume:w-24 transition-all duration-300 flex items-center">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={volume}
+                                    onChange={(e) => {
+                                        handleVolumeChange(parseFloat(e.target.value));
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-20 h-1 bg-white/30 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white hover:[&::-webkit-slider-thumb]:scale-110 accent-white"
+                                />
+                            </div>
                         </div>
-                        <span className="text-white/90 text-xs font-mono select-none tabular-nums min-w-[7rem]">
-                            {formatTime(duration * (progressApi.progress / 100))} / {formatTime(duration)}
+
+                        <span className="text-sm font-medium font-sans opacity-90">
+                            {formatTime(duration * (progress / 100))} <span className="text-white/50 text-xs mx-1">/</span> {formatTime(duration)}
                         </span>
+
                         <div className="flex-1" />
-                        <EpisodeControls onPrevEpisode={onPrevEpisode} onNextEpisode={onNextEpisode} hasPrevEpisode={hasPrevEpisode} hasNextEpisode={hasNextEpisode} variant="desktop" />
-                        <ControlButtons buttonsApi={buttonsApi} variant="desktop" />
-                        {showSettings && (
-                            <PlayerSettingsPanel settingsApi={settingsApi} onClose={() => setShowSettings(false)} className="absolute bottom-full right-4 mb-4" />
-                        )}
+
+                        <ControlButtons player={player} variant="desktop" />
                     </div>
                 </div>
             </div>
-
-            {/* Mobile Settings Panel */}
-            {showSettings && (
-                <div className="md:hidden">
-                    <PlayerSettingsPanel settingsApi={settingsApi} onClose={() => setShowSettings(false)} className="absolute bottom-full right-2 mb-2" />
-                </div>
-            )}
         </>
     );
 });
+
+VideoControls.displayName = 'VideoControls';
 
 export default VideoControls;

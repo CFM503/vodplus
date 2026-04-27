@@ -1,34 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Gauge, ZoomIn, X, FastForward, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 
-interface SettingsPanelApi {
-    currentLevel: number;
-    levels: { height: number; index: number }[];
-    activeLevelIdx: number;
-    playbackRate: number;
-    handleRateChange: (rate: number) => void;
-    videoScale: number;
-    handleScaleChange: (scale: number) => void;
-    maxBufferLength: number;
-    handleBufferChange: (buf: number) => void;
-    handleResolutionChange: (idx: number) => void;
-    skipIntroTime: React.RefObject<number>;
-    handleSkipIntroChange: (seconds: number) => void;
-}
+type PlayerState = ReturnType<typeof useVideoPlayer>;
 
 interface PlayerSettingsPanelProps {
-    settingsApi: SettingsPanelApi;
+    player: PlayerState;
     onClose: () => void;
     className?: string;
 }
 
-export default function PlayerSettingsPanel({ settingsApi, onClose, className }: PlayerSettingsPanelProps) {
+export default function PlayerSettingsPanel({ player, onClose, className }: PlayerSettingsPanelProps) {
     const {
-        currentLevel, levels, activeLevelIdx, playbackRate, handleRateChange,
-        videoScale, handleScaleChange, maxBufferLength, handleBufferChange,
-        handleResolutionChange, skipIntroTime, handleSkipIntroChange,
-    } = settingsApi;
+        currentLevel,
+        levels,
+        activeLevelIdx,
+        playbackRate,
+        handleRateChange,
+        videoScale,
+        handleScaleChange,
+        maxBufferLength,
+        handleBufferChange,
+        handleResolutionChange,
+        skipIntroTime,
+        handleSkipIntroChange,
+    } = player;
 
     // Local state for skip intro time display, initialized from ref
     const [localSkipTime, setLocalSkipTime] = useState(() => skipIntroTime.current);
@@ -38,14 +35,9 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
         setLocalSkipTime(next);
         handleSkipIntroChange(next);
     };
-    
-    // Sync local state when ref changes (e.g., from session storage)
-    useEffect(() => {
-        setLocalSkipTime(skipIntroTime.current);
-    }, [skipIntroTime.current]);
 
     return (
-        <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left", className)}>
+        <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left w-64", className)}>
             {/* Panel Header */}
             <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
                 <span className="text-sm font-bold text-white">播放设置</span>
@@ -138,7 +130,7 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
                 <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
                     <span>缓存策略</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex gap-1.5">
                     {[
                         { label: '10s', value: 10 },
                         { label: '30s', value: 30 },
@@ -150,7 +142,7 @@ export default function PlayerSettingsPanel({ settingsApi, onClose, className }:
                             key={value}
                             onClick={() => handleBufferChange(value)}
                             className={cn(
-                                "px-3 py-1.5 text-xs rounded-md transition-all",
+                                "px-2 py-1 text-xs rounded-md transition-all",
                                 maxBufferLength === value ? "bg-indigo-600 text-white" : "bg-white/10 text-slate-300 hover:bg-white/20"
                             )}
                         >

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type Hls from 'hls.js';
+import { CONFIG } from '@/config/config';
 
 interface UseVideoSeekProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -44,51 +45,58 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
         };
     }, []);
 
-    const handleSeekStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-        const isTouch = 'touches' in e;
-        if (isTouch && !isHoveringRef.current) return;
-
+    /**
+     * handleSeekStart: Called when pointer goes down on the progress bar.
+     * Sets up drag state and records initial position.
+     */
+    const handleSeekStart = useCallback((clientX: number) => {
         if (!progressBarRef.current || !videoRef.current) return;
         const rect = progressBarRef.current.getBoundingClientRect();
         progressRectRef.current = rect;
 
         if (rect.width === 0) return;
 
-        const clientX = 'touches' in e
-            ? (e as React.TouchEvent).touches[0].clientX
-            : (e as React.MouseEvent).clientX;
-
         const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
 
         setDragProgress(percent);
         dragProgressRef.current = percent;
+        isDraggingRef.current = true;
         setIsDragging(true);
-
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
     }, []);
 
-    const handleSeekMove = useCallback((e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
+    /**
+     * handleSeekMove: Called when pointer moves while dragging.
+     * Updates the drag progress percentage.
+     */
+    const handleSeekMove = useCallback((clientX: number) => {
         if (!isDraggingRef.current || !progressRectRef.current) return;
         const rect = progressRectRef.current;
-        const clientX = 'touches' in e
-            ? (e as TouchEvent).touches[0].clientX
-            : ('clientX' in e ? (e as MouseEvent).clientX : 0);
-
-        if (clientX === 0) return;
         const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
         setDragProgress(percent);
         dragProgressRef.current = percent;
     }, []);
 
+    /**
+     * handleSeekEnd: Called when pointer is released.
+     * Seeks the video to the drag position and resumes playback.
+     */
     const handleSeekEnd = useCallback(() => {
         if (!isDraggingRef.current) return;
         const video = videoRef.current;
+        const finalProgress = dragProgressRef.current;
+
         if (video && video.duration) {
-            const targetTime = (dragProgressRef.current / 100) * video.duration;
+            const targetTime = (finalProgress / 100) * video.duration;
             if (Number.isFinite(targetTime)) {
                 video.currentTime = targetTime;
-                if (setProgressProp) setProgressProp(dragProgressRef.current);
+                if (setProgressProp) setProgressProp(finalProgress);
+            }
+
+            // Resume playback after seeking
+            if (video.paused && !video.ended) {
+                video.play().catch(error => {
+                    if (error instanceof Error && error.name !== 'AbortError') { /* ignore */ }
+                });
             }
 
             if (hlsRef.current && video.paused && !video.ended) {
@@ -104,26 +112,14 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
         lastSeekEndTimeRef.current = Date.now();
     }, [setProgressProp]);
 
-    // Global listeners for desktop dragging
-    useEffect(() => {
-        if (!isDragging) return;
-
-        const onMouseMove = (e: MouseEvent) => handleSeekMove(e);
-        const onMouseUp = () => handleSeekEnd();
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
-    }, [isDragging, handleSeekMove, handleSeekEnd]);
-
     const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
 
         const video = videoRef.current;
         if (!video || isDraggingRef.current) return;
+
+        // Suppress click that fires after a drag ends (pointerup → click)
+        if (Date.now() - lastSeekEndTimeRef.current < CONFIG.SEEK_CLICK_SUPPRESSION_DELAY) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const pos = calculatePosition(e.clientX, rect);

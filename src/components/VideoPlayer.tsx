@@ -111,7 +111,10 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
             onMouseEnter={() => player.setIsHovering(true)}
             onMouseLeave={() => player.setIsHovering(false)}
             onMouseMove={handleMouseMove}
-            onTouchStart={handleTouchStart}
+            onTouchStart={(e) => {
+                player.setIsHovering(true);
+                handleTouchStart(e);
+            }}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onClick={() => {
@@ -185,13 +188,10 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 </div>
             )}
 
-            {/* Controls (conditionally rendered but always mounted when video is playing) */}
-            {isHovering && (
+            {/* Controls - always visible on mobile, desktop when hovering */}
+            {(isHovering || true) && (
                 <VideoControls
-                    controlsApi={controlsApi}
-                    progressApi={progressApi}
-                    settingsApi={settingsApi}
-                    buttonsApi={buttonsApi}
+                    player={player}
                     url={url}
                     title={title}
                     onPrevEpisode={onPrevEpisode}

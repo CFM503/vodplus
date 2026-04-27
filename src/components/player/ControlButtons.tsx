@@ -1,21 +1,24 @@
 import React from 'react';
 import { Settings, Maximize, Minimize } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import PlayerSettingsPanel from './PlayerSettingsPanel';
 
+type PlayerState = ReturnType<typeof useVideoPlayer>;
+
 interface ControlButtonsProps {
-    buttonsApi: {
-        showSettings: boolean;
-        setShowSettings: (v: boolean) => void;
-        toggleFullscreen: () => void;
-        toggleWebFullscreen: () => void;
-        isWebFullscreen: boolean;
-    };
+    player: PlayerState;
     variant?: 'desktop' | 'mobile';
 }
 
-const ControlButtons = React.memo(function ControlButtons({ buttonsApi, variant = 'desktop' }: ControlButtonsProps) {
-    const { showSettings, setShowSettings, toggleFullscreen, toggleWebFullscreen, isWebFullscreen } = buttonsApi;
+const ControlButtons = React.memo(function ControlButtons({ player, variant = 'desktop' }: ControlButtonsProps) {
+    const {
+        showSettings,
+        setShowSettings,
+        toggleFullscreen,
+        toggleWebFullscreen,
+        isWebFullscreen
+    } = player;
 
     const iconClass = variant === 'mobile' ? "w-5 h-5 text-white" : "w-6 h-6 text-white";
     const btnClass = variant === 'mobile'
@@ -43,31 +46,42 @@ const ControlButtons = React.memo(function ControlButtons({ buttonsApi, variant 
                     className={cn(
                         btnClass,
                         variant === 'desktop' && "hover:rotate-45 duration-300",
-                        showSettings && (variant === 'desktop' ? "rotate-45 text-indigo-400" : "bg-white/20")
+                        showSettings && (variant === 'desktop' ? "rotate-45 text-indigo-400" : "bg-white/10")
                     )}
-                    title="Settings"
+                    title="设置"
                 >
                     <Settings className={iconClass} />
                 </button>
+
+                {showSettings && variant === 'desktop' && (
+                    <div
+                        className="absolute bottom-full right-0 mb-4 z-50 min-w-[280px] animate-in fade-in slide-in-from-bottom-2"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <PlayerSettingsPanel
+                            player={player}
+                            onClose={() => setShowSettings(false)}
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* Web Fullscreen */}
-            <button
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    toggleWebFullscreen();
-                }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    toggleWebFullscreen();
-                }}
-                className={btnClass}
-                title={isWebFullscreen ? 'Exit Web Fullscreen' : 'Web Fullscreen'}
-            >
-                {isWebFullscreen ? <Minimize className={iconClass} /> : <Maximize className={cn(iconClass, "scale-90")} />}
-            </button>
+            {/* Web Fullscreen (Desktop Only) */}
+            {variant === 'desktop' && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleWebFullscreen();
+                    }}
+                    className={btnClass}
+                    title="网页全屏"
+                >
+                    {isWebFullscreen
+                        ? <Minimize className={iconClass} />
+                        : <Maximize className={cn(iconClass, "box-content p-0.5 border-2 border-dashed border-white/40 rounded-sm")} />
+                    }
+                </button>
+            )}
 
             {/* Fullscreen */}
             <button
@@ -81,16 +95,15 @@ const ControlButtons = React.memo(function ControlButtons({ buttonsApi, variant 
                     e.stopPropagation();
                     toggleFullscreen();
                 }}
-                className={cn(
-                    btnClass,
-                    variant === 'mobile' && "hidden"
-                )}
-                title="Fullscreen"
+                className={cn(btnClass, "shrink-0")}
+                title="全屏"
             >
                 <Maximize className={iconClass} />
             </button>
         </div>
     );
 });
+
+ControlButtons.displayName = 'ControlButtons';
 
 export default ControlButtons;
