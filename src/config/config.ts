@@ -57,12 +57,12 @@ export const CONFIG = {
 
     // 控制栏自动隐藏延迟 (毫秒)
     // 鼠标静止多久后隐藏 UI
-    CONTROLS_AUTO_HIDE_TIME: 3000,
+    CONTROLS_AUTO_HIDE_TIME: 8000,
 
     // 是否自动隐藏控制栏
     // true: 鼠标静止后自动隐藏
     // false: 鼠标静止后保持显示 (仅移出播放器区域或点击视频时隐藏)
-    AUTO_HIDE_CONTROLS: false,
+    AUTO_HIDE_CONTROLS: true,
 
     // 双击判定时间间隔 (毫秒)
     // 两次点击在此间隔内才算双击

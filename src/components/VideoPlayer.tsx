@@ -39,14 +39,10 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         handleVolumeChange: player.handleVolumeChange,
         duration: player.duration,
         videoRef: player.videoRef,
-        isLocked: player.isLocked,
-        handleLock: player.handleLock,
-        handleUnlock: player.handleUnlock,
         showSettings: player.showSettings,
         setShowSettings: player.setShowSettings,
     }), [player.isPlaying, player.togglePlay, player.toggleMute, player.isMuted,
         player.volume, player.handleVolumeChange, player.duration,
-        player.isLocked, player.handleLock, player.handleUnlock,
         player.showSettings, player.setShowSettings]);
 
     const progressApi = useMemo(() => ({
@@ -107,7 +103,10 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     return (
         <div
             ref={containerRef}
-            className="relative w-full aspect-video bg-black select-none group rounded-xl overflow-hidden"
+            className={cn(
+                "relative w-full aspect-video bg-black select-none group rounded-xl overflow-hidden",
+                !isHovering && isPlaying && "cursor-none"
+            )}
             onMouseEnter={() => player.setIsHovering(true)}
             onMouseLeave={() => player.setIsHovering(false)}
             onMouseMove={handleMouseMove}
@@ -188,8 +187,13 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 </div>
             )}
 
-            {/* Controls - always visible on mobile, desktop when hovering */}
-            {(isHovering || true) && (
+            {/* Controls — fade in/out with smooth transition */}
+            <div
+                className={cn(
+                    "transition-opacity duration-300",
+                    isHovering || !isPlaying ? "opacity-100" : "opacity-0 pointer-events-none"
+                )}
+            >
                 <VideoControls
                     player={player}
                     url={url}
@@ -199,7 +203,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                     hasPrevEpisode={hasPrevEpisode}
                     hasNextEpisode={hasNextEpisode}
                 />
-            )}
+            </div>
         </div>
     );
 }

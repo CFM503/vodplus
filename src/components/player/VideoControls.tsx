@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Pause, Volume2, VolumeX, Unlock, Lock } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { formatTime } from '@/lib/player-utils';
@@ -43,9 +43,6 @@ const VideoControls = React.memo(function VideoControls({
         formatTime,
         videoRef,
         progress,
-        isLocked,
-        handleLock,
-        handleUnlock,
         showSettings,
         setShowSettings,
     } = player;
@@ -61,19 +58,6 @@ const VideoControls = React.memo(function VideoControls({
                 )}
             </div>
 
-            {/* Mobile Lock Button */}
-            <div className="absolute top-4 right-4 pointer-events-auto z-30">
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (isLocked) handleUnlock(); else handleLock();
-                    }}
-                    className="p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white active:scale-95 transition-all"
-                    title={isLocked ? "Unlock" : "Lock"}
-                >
-                    {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-[18px] h-[18px]" />}
-                </button>
-            </div>
 
             {/* Center Play Button */}
             {CONFIG.SHOW_CENTER_PLAY_BUTTON === 1 && (
