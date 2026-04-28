@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Loader2, Play, Pause, Volume2 } from 'lucide-react';
+import { Loader2, Play, Pause, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import VideoControls from '@/components/player/VideoControls';
@@ -166,8 +166,8 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
                     <div className="bg-black/80 backdrop-blur-sm rounded-xl px-4 py-3 flex flex-col items-center gap-1 shadow-2xl border border-white/10">
                         {gestureHUD.icon === 'volume' && <Volume2 className="w-8 h-8 text-white" />}
-                        {gestureHUD.icon === 'brightness' && <Volume2 className="w-8 h-8 text-yellow-400" />}
-                        {gestureHUD.icon === 'seek' && <Volume2 className="w-8 h-8 text-indigo-400" />}
+                        {gestureHUD.icon === 'brightness' && <Sun className="w-8 h-8 text-yellow-400" />}
+                        {gestureHUD.icon === 'seek' && <FastForward className="w-8 h-8 text-indigo-400" />}
                         <span className="text-white text-base font-bold font-mono">{gestureHUD.value}</span>
                     </div>
                 </div>
