@@ -163,14 +163,6 @@ export function useVideoEvents({
         };
     }, []);
 
-    // Sync volume and muted to video element when loading completes
-    useEffect(() => {
-        if (!isLoading && videoRef.current) {
-            videoRef.current.volume = volume;
-            videoRef.current.muted = isMuted;
-        }
-    }, [isLoading, volume, isMuted]);
-
     // Sync playback rate, volume, mute to video element
     useEffect(() => {
         if (videoRef.current && !isLoading) {

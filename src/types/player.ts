@@ -48,7 +48,7 @@ export interface VideoUIState {
     showSettings: boolean;
     isDragging: boolean;
     dragProgress: number;
-    isLocked: boolean;
+
     isWebFullscreen: boolean;
     isEmbed: boolean;
 }
@@ -170,15 +170,12 @@ export interface UseVideoSettingsOutput {
     setPlaybackRate: (v: number) => void;
     videoScale: number;
     setVideoScale: (v: number) => void;
-    isLocked: boolean;
-    toast: ToastData;
+
     skipIntroTimeRef: { current: number };
     handleResolutionChange: (idx: number) => void;
     handleRateChange: (rate: number) => void;
     handleScaleChange: (scale: number) => void;
     handleBufferChange: (buf: number) => void;
-    handleLock: () => void;
-    handleUnlock: () => void;
     handleSkipIntroChange: (seconds: number) => void;
     showToast: (message: string) => void;
 }
@@ -218,9 +215,6 @@ export interface ControlsApi {
     handleVolumeChange: (newVolume: number) => void;
     duration: number;
     videoRef: RefObject<HTMLVideoElement | null>;
-    isLocked: boolean;
-    handleLock: () => void;
-    handleUnlock: () => void;
     showSettings: boolean;
     setShowSettings: (v: boolean) => void;
 }
@@ -284,7 +278,7 @@ export interface PlayerAPI {
     showSettings: boolean;
     playbackRate: number;
     videoScale: number;
-    isLocked: boolean;
+
     isWebFullscreen: boolean;
     isDragging: boolean;
     dragProgress: number;
@@ -320,8 +314,7 @@ export interface PlayerAPI {
     isSpeedHolding: boolean;
     handleScaleChange: (scale: number) => void;
     handleBufferChange: (buf: number) => void;
-    handleLock: () => void;
-    handleUnlock: () => void;
+
     handleMouseMove: (e: React.MouseEvent) => void;
     handleVideoClick: (e: React.MouseEvent | React.TouchEvent) => void;
     handleTouchStart: (e: React.TouchEvent) => void;

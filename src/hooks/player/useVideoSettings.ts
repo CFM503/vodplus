@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
-import { logger } from '@/lib/logger';
 
 interface UseVideoSettingsProps {
     hlsRef: React.RefObject<InstanceType<typeof Hls> | null>;
@@ -23,7 +22,6 @@ export function useVideoSettings({
     maxBufferLength, setMaxBufferLength,
 }: UseVideoSettingsProps) {
     const [showSettings, setShowSettings] = useState(false);
-    const [isLocked, setIsLocked] = useState(false);
 
     const handleResolutionChange = useCallback((idx: number) => {
         if (!hlsRef.current) return;
@@ -60,39 +58,13 @@ export function useVideoSettings({
         }
     }, [skipIntroTimeRef]);
 
-    const handleLock = useCallback(() => {
-        setIsLocked(true);
-        const orientation = screen.orientation as { type?: string; lock?: (orientation: string) => Promise<void> } | null;
-        if (typeof screen !== 'undefined' && orientation && orientation.lock) {
-            const currentType = orientation.type;
-            if (currentType) {
-                orientation.lock(currentType).catch((err: unknown) => {
-                    logger.error('VideoPlayer', '方向锁定失败:', err);
-                });
-        setShowSettings(false);
-            }
-        }
-        showToast("已开启旋转锁定");
-    }, [showToast]);
-
-    const handleUnlock = useCallback(() => {
-        setIsLocked(false);
-        if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-        }
-        showToast("已恢复自动旋转");
-    }, [showToast]);
-
     return {
         showSettings,
         setShowSettings,
-        isLocked,
         handleResolutionChange,
         handleRateChange,
         handleScaleChange,
         handleBufferChange,
         handleSkipIntroChange,
-        handleLock,
-        handleUnlock,
     };
 }

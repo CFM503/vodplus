@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { CONFIG } from '@/config/config';
 
 interface UseVideoGesturesProps {
@@ -35,11 +35,9 @@ export function useVideoGestures({
     const gestureTypeRef = useRef<'none' | 'vertical-left' | 'vertical-right' | 'horizontal'>('none');
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const lastMousePosRef = useRef({ x: 0, y: 0 });
-    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const showGestureHUD = useCallback((icon: 'volume' | 'brightness' | 'seek', value: string) => {
         setGestureHUD({ icon, value, visible: true });
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     }, []);
 
     const hideGestureHUD = useCallback(() => {
@@ -146,6 +144,15 @@ export function useVideoGestures({
 
         return isTap;
     }, [isSpeedHolding, handleSpeedHoldEnd, hideGestureHUD]);
+
+    // 长按加速时显示/隐藏 HUD
+    useEffect(() => {
+        if (isSpeedHolding) {
+            showGestureHUD('seek', `${CONFIG.LONG_PRESS_SPEED}x`);
+        } else {
+            hideGestureHUD();
+        }
+    }, [isSpeedHolding, showGestureHUD, hideGestureHUD]);
 
     return {
         brightness,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Loader2, Play, Pause, Volume2, Sun, FastForward } from 'lucide-react';
+import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import VideoControls from '@/components/player/VideoControls';
@@ -25,7 +25,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleVideoClick, handleMouseMove, handleTouchStart, handleTouchMove,
-        handleTouchEnd, isLocked, isEmbed, brightness, gestureHUD, toast, videoScale,
+        handleTouchEnd, isEmbed, brightness, gestureHUD, toast, videoScale,
         isMuted, togglePlay, showSettings,
     } = player;
 
@@ -135,7 +135,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 preload="metadata"
                 crossOrigin="anonymous"
                 muted={isMuted}
-                style={!isLocked ? { transform: `scale(${videoScale})`, transformOrigin: 'center center' } : undefined}
+                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center' }}
             />
 
             {/* Loading Spinner */}

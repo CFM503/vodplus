@@ -46,10 +46,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     const [maxBufferLength, setMaxBufferLength] = useState(CONFIG.DEFAULT_BUFFER_LENGTH);
     const [videoScale, setVideoScale] = useState(1);
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
-    const [brightness, setBrightness] = useState(100);
-    const [gestureHUD, setGestureHUD] = useState<GestureHUDState>({
-        icon: 'seek', value: '', visible: false,
-    });
     const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
     const isEmbed = url ? (!url.includes('.m3u8') && !url.includes('.mp4') && !url.includes('.webm') && url.startsWith('http')) : false;
@@ -64,11 +60,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         toastTimerRef.current = setTimeout(() => {
             setToast({ message: '', visible: false });
         }, CONFIG.TOAST_DISPLAY_TIME);
-    }, []);
-
-    const showGestureHUD = useCallback((icon: 'volume' | 'brightness' | 'seek', value: string) => {
-        setGestureHUD({ icon, value, visible: true });
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     }, []);
 
     const toggleMute = useCallback(() => {
@@ -100,7 +91,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         if (!video) return;
         video.playbackRate = CONFIG.LONG_PRESS_SPEED;
         setIsSpeedHolding(true);
-        setGestureHUD({ icon: 'seek', value: `${CONFIG.LONG_PRESS_SPEED}x`, visible: true });
     }, []);
 
     const handleSpeedHoldEnd = useCallback(() => {
@@ -108,7 +98,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         if (!video) return;
         video.playbackRate = playbackRate;
         setIsSpeedHolding(false);
-        setGestureHUD(prev => ({ ...prev, visible: false }));
     }, [playbackRate]);
 
     // ===========================
@@ -205,7 +194,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         showSettings: settings.showSettings,
         togglePlay,
         handleSeekRelative,
-        showGestureHUD,
+        showGestureHUD: gestures.showGestureHUD,
         setShowSettings: settings.setShowSettings,
         lastSeekEndTimeRef,
     });
@@ -301,12 +290,12 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         showSettings: settings.showSettings,
         playbackRate,
         videoScale,
-        isLocked: settings.isLocked,
+
         isWebFullscreen: controls.isWebFullscreen,
         isDragging: seek.isDragging,
         dragProgress: seek.dragProgress,
-        brightness,
-        gestureHUD,
+        brightness: gestures.brightness,
+        gestureHUD: gestures.gestureHUD,
         toast,
         levels: hlsSource.levels,
         skipIntroTime: hlsSource.skipIntroTimeRef,
@@ -335,8 +324,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         isSpeedHolding,
         handleScaleChange: settings.handleScaleChange,
         handleBufferChange: handleBufferChangeWired,
-        handleLock: settings.handleLock,
-        handleUnlock: settings.handleUnlock,
+
         handleMouseMove: handleMouseMoveWired,
         handleVideoClick: controls.handleVideoClick,
         handleTouchStart: gestures.handleTouchStart,

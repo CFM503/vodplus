@@ -4,7 +4,6 @@ import React from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
-import { formatTime } from '@/lib/player-utils';
 import { CONFIG } from '@/config/config';
 import VideoProgressBar from './VideoProgressBar';
 import EpisodeControls from './EpisodeControls';
