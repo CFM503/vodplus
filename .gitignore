@@ -45,3 +45,13 @@ next-env.d.ts
 # kvideo reference (temporary)
 /kvideo_reference
 /test_*.txt
+
+# backup files
+*.bak
+*.bak[0-9]*
+*.orig
+*.old
+
+# AI tool configs
+.openclaude/
+.opencode/
