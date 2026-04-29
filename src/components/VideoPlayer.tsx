@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -24,10 +24,13 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl });
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
-        handleVideoClick, handleMouseMove, handleTouchStart, handleTouchMove,
+        handleMouseMove, handleTouchStart, handleTouchMove,
         handleTouchEnd, isEmbed, brightness, gestureHUD, toast, videoScale,
         isMuted, togglePlay, showSettings,
     } = player;
+
+    // Ref to suppress synthetic click/dblclick events originating from touch
+    const touchEndTimeRef = useRef(0);
 
     // Memoized subset APIs for child components
     const controlsApi = useMemo(() => ({
@@ -110,19 +113,23 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
             onMouseEnter={() => player.setIsHovering(true)}
             onMouseLeave={() => player.setIsHovering(false)}
             onMouseMove={handleMouseMove}
-            onTouchStart={(e) => {
-                player.setIsHovering(true);
-                handleTouchStart(e);
-            }}
+            onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            onTouchEnd={(e) => {
+                touchEndTimeRef.current = Date.now();
+                handleTouchEnd(e);
+            }}
             onClick={() => {
+                // 移动端的点击由 touch 事件链处理，这里只响应 PC 端鼠标点击
+                if (Date.now() - touchEndTimeRef.current < 500) return;
                 if (!showSettings) {
                     togglePlay();
                 }
-            }} onDoubleClick={(e) => {
+            }}
+            onDoubleClick={() => {
+                if (Date.now() - touchEndTimeRef.current < 500) return;
                 if (!showSettings) {
-                    handleVideoClick(e);
+                    player.toggleFullscreen();
                 }
             }}
         >
