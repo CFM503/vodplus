@@ -103,6 +103,7 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                 </div>
             </div>
 
+
             {/* Video Zoom */}
             <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
@@ -122,6 +123,36 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                             {scale}x
                         </button>
                     ))}
+                    <button
+                        onClick={() => {
+                            const video = player.videoRef?.current;
+                            const container = player.containerRef?.current;
+                            if (!video || !container) return;
+                            const rect = container.getBoundingClientRect();
+                            const vw = video.videoWidth;
+                            const vh = video.videoHeight;
+                            if (!vw || !vh || !rect.height || !rect.width) return;
+                            const videoAspect = vw / vh;
+                            const containerAspect = rect.width / rect.height;
+                            if (videoAspect > containerAspect) {
+                                // 视频比容器更宽 → 上下有黑边，缩放至填满高度
+                                const renderedH = rect.width / videoAspect;
+                                const scale = Math.round((rect.height / renderedH) * 100) / 100;
+                                handleScaleChange(scale);
+                            } else {
+                                // 高度已填满，无需缩放
+                                handleScaleChange(1);
+                            }
+                        }}
+                        className={cn(
+                            "px-3 py-1.5 text-xs rounded-md transition-all",
+                            ![1, 1.5, 2, 3].includes(videoScale) && videoScale !== 1
+                                ? "bg-indigo-600 text-white"
+                                : "bg-white/10 text-slate-300 hover:bg-white/20"
+                        )}
+                    >
+                        适配高度
+                    </button>
                 </div>
             </div>
 
