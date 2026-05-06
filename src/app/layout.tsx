@@ -5,7 +5,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 // Using system fonts to avoid Google Fonts connection issues in domestic environment
 export const metadata: Metadata = {
   title: "vod",
-  description: "vod - 鏋侀€熷奖闄?";
+  description: "vod - 鏋侀€熷奖闄?",
 };
 
 export default function RootLayout({
