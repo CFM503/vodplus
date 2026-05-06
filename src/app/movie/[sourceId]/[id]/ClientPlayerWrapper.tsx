@@ -18,8 +18,26 @@ const VideoPlayer = dynamic(
   }
 );
 
-export function ClientPlayerWrapper({
-  url,
+interface Episode {
+  url: string;
+  title: string;
+}
+
+interface ClientPlayerWrapperProps {
+  episodes: Episode[];
+  poster: string;
+  title?: string;
+  onEnded?: () => void;
+  autoplay?: boolean;
+  onPrevEpisode?: () => void;
+  onNextEpisode?: () => void;
+  hasPrevEpisode?: boolean;
+  hasNextEpisode?: boolean;
+  nextEpisodeUrl?: string;
+}
+
+export default function ClientPlayerWrapper({
+  episodes,
   poster,
   title,
   onEnded,
@@ -29,7 +47,7 @@ export function ClientPlayerWrapper({
   hasPrevEpisode = false,
   hasNextEpisode = false,
   nextEpisodeUrl,
-}) {
+}: ClientPlayerWrapperProps) {
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
@@ -40,7 +58,7 @@ export function ClientPlayerWrapper({
     <div className="w-full">
       {isVisible ? (
         <VideoPlayer
-          url={url}
+          url={episodes[0]?.url || ''}
           poster={poster}
           title={title}
           onEnded={onEnded}
