@@ -37,7 +37,10 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
     };
 
     return (
-        <div className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left w-64", className)}>
+        <div
+            className={cn("bg-slate-900 rounded-lg p-4 shadow-xl border border-white/10 text-left w-64", className)}
+            onClick={(e) => e.stopPropagation()}
+        >
             {/* Panel Header */}
             <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-2">
                 <span className="text-sm font-bold text-white">播放设置</span>

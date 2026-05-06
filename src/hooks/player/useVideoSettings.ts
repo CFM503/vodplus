@@ -39,7 +39,6 @@ export function useVideoSettings({
 
     const handleScaleChange = useCallback((scale: number) => {
         setVideoScale(scale);
-        setShowSettings(false);
         showToast(`画面比例已缩放至 ${scale}x`);
     }, [setVideoScale, showToast]);
 

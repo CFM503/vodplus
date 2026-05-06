@@ -198,7 +198,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
             <div
                 className={cn(
                     "transition-opacity duration-300",
-                    isHovering || !isPlaying ? "opacity-100" : "opacity-0 pointer-events-none"
+                    isHovering || !isPlaying || showSettings ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}
             >
                 <VideoControls

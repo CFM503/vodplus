@@ -92,7 +92,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
     } catch (_) { }
 
     return (
-        <div className="min-h-screen bg-slate-950 pb-20">
+        <div className="min-h-screen bg-slate-950 pb-20" suppressHydrationWarning>
             {/* Preconnect to CDN origin for faster HLS loading */}
             {cdnOrigin && (
                 <>

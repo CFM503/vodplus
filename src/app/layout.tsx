@@ -5,7 +5,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 // Using system fonts to avoid Google Fonts connection issues in domestic environment
 export const metadata: Metadata = {
   title: "vod",
-  description: "vod - 鏋侀€熷奖闄?",
+  description: "vod - 极速影院",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-            <head>
+      <head>
         <meta name="referrer" content="no-referrer" />
         <link rel="preconnect" href="https://image.tmdb.org" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
@@ -29,7 +29,7 @@ export default function RootLayout({
           fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
         }}
       >
-        <div className="relative z-0">
+        <div className="relative z-0" suppressHydrationWarning>
           {children}
         </div>
         <ScrollToTop />

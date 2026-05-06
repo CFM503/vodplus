@@ -1,4 +1,4 @@
-﻿import { Suspense } from "react";
+import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { HomeSection } from "@/components/home/HomeSection";
 import { HomeSkeleton } from "@/components/home/HomeSkeleton";
@@ -13,8 +13,12 @@ export const runtime = "edge";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "VOD Platform",
-  description: "Fast video streaming",
+  title: "VOD 视频聚合播放平台",
+  description: "极速视频聚合平台，0等待播放体验",
+  openGraph: {
+    title: "VOD 视频聚合播放平台",
+    description: "极速视频聚合平台，0等待播放体验",
+  },
 };
 
 export const fetchCache = "force-no-store";
@@ -46,47 +50,55 @@ const getCachedNewestTv = unstable_cache(
 async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedTrendingMovies(source, disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
-  return <HomeSection title={source === "tmdb" ? "Trending Movies" : "Hot Movies"} list={list} iconColor="indigo" />;
+  return <HomeSection title={source === "tmdb" ? "今日趋势 (电影)" : "热门电影 (本地)"} list={list} iconColor="indigo" />;
 }
 
 async function ActionSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedNewestAction(disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
-  return <HomeSection title="Newest Action" list={list} iconColor="orange" />;
+  return <HomeSection title="最新入库 (动作片)" list={list} iconColor="orange" />;
 }
 
 async function TrendingTvSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedTrendingTv(source, disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
-  return <HomeSection title={source === "tmdb" ? "Trending TV" : "Hot TV"} list={list} iconColor="emerald" />;
+  return <HomeSection title={source === "tmdb" ? "今日趋势 (电视剧)" : "热门剧集 (本地)"} list={list} iconColor="emerald" />;
 }
 
 async function NewestTvSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedNewestTv(disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
-  return <HomeSection title="Newest TV" list={list} iconColor="pink" />;
+  return <HomeSection title="最新入库 (国产剧)" list={list} iconColor="pink" />;
 }
 
 export default async function Home() {
   const cookieStore = await cookies();
   const { disabledSources, movieSource, tvSource, customLocalUrl } = await getUserPreferences(cookieStore);
+
   return (
-    <div className="min-h-screen bg-slate-950 pb-20">
+    <div className="min-h-screen bg-slate-950 pb-20 selection:bg-indigo-500/30">
       <Header />
+
       <main className="container mx-auto px-4 py-8 space-y-12">
-        <Suspense fallback={<HomeSkeleton title="Trending Movies" />}>
+
+        <Suspense fallback={<HomeSkeleton title="今日趋势 (电影)" />}>
           <TrendingMoviesSection source={movieSource} disabledSources={disabledSources} customLocalUrl={customLocalUrl} />
         </Suspense>
-        <Suspense fallback={<HomeSkeleton title="Newest Action" />}>
+
+        <Suspense fallback={<HomeSkeleton title="最新入库 (动作片)" />}>
           <ActionSection disabledSources={disabledSources} customLocalUrl={customLocalUrl} />
         </Suspense>
-        <Suspense fallback={<HomeSkeleton title="Trending TV" />}>
+
+        <Suspense fallback={<HomeSkeleton title="今日趋势 (电视剧)" />}>
           <TrendingTvSection source={tvSource} disabledSources={disabledSources} customLocalUrl={customLocalUrl} />
         </Suspense>
-        <Suspense fallback={<HomeSkeleton title="Newest TV" />}>
+
+        <Suspense fallback={<HomeSkeleton title="最新入库 (国产剧)" />}>
           <NewestTvSection disabledSources={disabledSources} customLocalUrl={customLocalUrl} />
         </Suspense>
+
       </main>
+
       <Footer />
     </div>
   );

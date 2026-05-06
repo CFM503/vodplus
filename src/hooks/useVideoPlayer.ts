@@ -44,7 +44,13 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     const [isMuted, setIsMuted] = useState(false);
     const [playbackRate, setPlaybackRate] = useState(1);
     const [maxBufferLength, setMaxBufferLength] = useState(CONFIG.DEFAULT_BUFFER_LENGTH);
-    const [videoScale, setVideoScale] = useState(1);
+    const [videoScale, setVideoScale] = useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = sessionStorage.getItem("VOD_VIDEO_SCALE");
+            if (saved) return parseFloat(saved);
+        }
+        return 1;
+    });
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
     const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
@@ -214,6 +220,13 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         toggleMute,
         volume,
     });
+
+    // Persist videoScale to sessionStorage
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("VOD_VIDEO_SCALE", videoScale.toString());
+        }
+    }, [videoScale]);
 
     // Skip intro effect
     useEffect(() => {
