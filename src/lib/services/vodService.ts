@@ -10,16 +10,33 @@ import { withErrorHandling } from './errorHandler';
 import { unstable_cache } from 'next/cache';
 import { logger } from '../logger';
 
+// Request deduplication cache to prevent duplicate simultaneous requests
+const pendingRequests = new Map<string, Promise<any>>();
+
+function dedupFetch<T>(key: string, fetchFn: () => Promise<T>): Promise<T> {
+  if (pendingRequests.has(key)) {
+    return pendingRequests.get(key) as Promise<T>;
+  }
+  const promise = fetchFn().finally(() => {
+    pendingRequests.delete(key);
+  });
+  pendingRequests.set(key, promise);
+  return promise;
+}
+
 export async function fetchFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<ApiResponse> {
-    const startTime = Date.now();
-    try {
-        const data = await fetchRawFromSource(source, params, noStore);
-        const duration = Date.now() - startTime;
-        return normalizeVodResponse(data, source, duration);
-    } catch (error) {
-        logger.error('FetchFromSource', `Error fetching from ${source.name}:`, error);
-        return { code: 500, msg: 'Error', page: 1, pagecount: 0, limit: 0, total: 0, list: [] };
-    }
+    const cacheKey = `${source.id}:${params}:${noStore}`;
+    return dedupFetch(cacheKey, async () => {
+        const startTime = Date.now();
+        try {
+            const data = await fetchRawFromSource(source, params, noStore);
+            const duration = Date.now() - startTime;
+            return normalizeVodResponse(data, source, duration);
+        } catch (error) {
+            logger.error('FetchFromSource', `Error fetching from ${source.name}:`, error);
+            return { code: 500, msg: 'Error', page: 1, pagecount: 0, limit: 0, total: 0, list: [] };
+        }
+    });
 }
 
 

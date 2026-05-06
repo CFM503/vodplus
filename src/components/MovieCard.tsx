@@ -9,11 +9,10 @@ import { useState, useRef } from 'react';
 import { CONFIG } from '@/config/config';
 import Link from 'next/link';
 import { parseVodPlayUrl } from '@/lib/vodParser';
+
 export function MovieCard({ movie, className, index = 999 }: { movie: Movie; className?: string; index?: number }) {
     if (!movie) return null;
 
-    // Determine link
-    // Ensure href is never empty or just #
     const isDiscoverySrc = movie.source_id === 'tmdb';
     const safeHref = movie.source_id && movie.vod_id
         ? `/movie/${movie.source_id}/${movie.vod_id}${isDiscoverySrc ? `?name=${encodeURIComponent(movie.vod_name)}` : ''}`
@@ -25,8 +24,6 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
     const handlePrefetch = () => {
         if (hasPrefetchedRef.current || !movie.source_id || !movie.vod_id || isDiscoverySrc) return;
         hasPrefetchedRef.current = true;
-        // 意图深度预加载：在点击前，强迫服务器解析真实的 m3u8 播放地址
-        // 并直接把那个最终的 m3u8 文件也塞进 Edge Cache！
         fetch(`/api/vod/latest?source=${encodeURIComponent(movie.source_id)}&id=${encodeURIComponent(movie.vod_id)}`, {
             priority: 'low',
             cache: 'force-cache'
@@ -38,7 +35,6 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                     if (detail && detail.vod_play_url) {
                         const episodes = parseVodPlayUrl(detail.vod_play_url);
                         if (episodes.length > 0 && episodes[0].url) {
-                            // 找到了真正的视频播放地址，马上用 no-cors 去把它下载到浏览器缓存
                             fetch(episodes[0].url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
                         }
                     }
@@ -67,6 +63,7 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                     quality={75}
                     priority={index < 6}
+                    loading={index < 6 ? 'eager' : 'lazy'}
                     placeholder="blur"
                     blurDataURL={CONFIG.IMAGE_BLUR_PLACEHOLDER}
                     className="object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
@@ -77,9 +74,7 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80 group-hover:opacity-90 transition-opacity pointer-events-none" />
 
-            {/* Badges Container - Top */}
             <div className="absolute top-2 left-2 right-2 z-10 flex items-start justify-between gap-1 pointer-events-none">
-                {/* Source Badge - Top Right */}
                 {movie.source_id && (
                     <div className={cn(
                         "px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md border shadow-lg transition-all duration-300 uppercase tracking-wider",
@@ -87,11 +82,10 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                             ? "bg-indigo-600/90 text-white border-indigo-400/50 ring-1 ring-indigo-400/30"
                             : "bg-slate-900/80 text-slate-300 border-white/10 group-hover:bg-indigo-600/90 group-hover:text-white group-hover:border-indigo-500/50"
                     )}>
-                        {isDiscoverySrc ? `★ TMDB` : movie.source_id.split(/[$.]/)[0]}
+                        {isDiscoverySrc ? `TMDB` : movie.source_id.split(/[$.]/)[0]}
                     </div>
                 )}
 
-                {/* Latency Badge - Top Left */}
                 {movie.latency !== undefined && (
                     <LatencyBadge latency={movie.latency} />
                 )}
