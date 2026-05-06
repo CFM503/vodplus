@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Episode } from '@/types';
 
 const VideoPlayer = dynamic(
   () => import('@/components/VideoPlayer').then((mod) => mod.default),
@@ -17,11 +18,6 @@ const VideoPlayer = dynamic(
     ssr: false,
   }
 );
-
-interface Episode {
-  url: string;
-  title: string;
-}
 
 interface ClientPlayerWrapperProps {
   episodes: Episode[];

@@ -43,25 +43,25 @@ const getCachedNewestTv = unstable_cache(
   { revalidate: CONFIG.API_REVALIDATE_SECONDS, tags: ["latest"] }
 );
 
-async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }) {
+async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedTrendingMovies(source, disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title={source === "tmdb" ? "Trending Movies" : "Hot Movies"} list={list} iconColor="indigo" />;
 }
 
-async function ActionSection({ disabledSources, customLocalUrl }) {
+async function ActionSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedNewestAction(disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title="Newest Action" list={list} iconColor="orange" />;
 }
 
-async function TrendingTvSection({ source, disabledSources, customLocalUrl }) {
+async function TrendingTvSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedTrendingTv(source, disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title={source === "tmdb" ? "Trending TV" : "Hot TV"} list={list} iconColor="emerald" />;
 }
 
-async function NewestTvSection({ disabledSources, customLocalUrl }) {
+async function NewestTvSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedNewestTv(disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title="Newest TV" list={list} iconColor="pink" />;
