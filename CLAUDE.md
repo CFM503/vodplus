@@ -63,3 +63,23 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+
+## 5. Protected Features (CRITICAL)
+
+**Some features are protected and MUST NOT be deleted, downgraded, or replaced.**
+
+Before any optimization or refactoring:
+- Read `PROTECTED_FEATURES.md` for the full manifest of protected features.
+- Read `AGENTS.md` for project-level AI instructions.
+- Run `git diff 07850eb..HEAD -- <file>` to see what changed from the stable baseline.
+
+Key protected areas:
+- Episode management in `ClientPlayerWrapper.tsx` (currentEpIndex, auto-play, prev/next)
+- Video scale persistence (`sessionStorage` in `useVideoPlayer.ts`)
+- Event propagation (`stopPropagation` in `PlayerSettingsPanel.tsx`)
+- Controls visibility during settings (`showSettings` in opacity logic of `VideoPlayer.tsx`)
+- `handleScaleChange` must NOT call `setShowSettings(false)`
+- Chinese content (titles, descriptions, comments) must not be garbled or replaced with English
+
+The golden rule: **Only add, never subtract.**
