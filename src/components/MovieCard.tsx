@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Movie } from '@/types';
 import { Play } from 'lucide-react';
@@ -68,7 +68,7 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                     blurDataURL={CONFIG.IMAGE_BLUR_PLACEHOLDER}
                     className="object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
                     onError={() => {
-                        setImgSrc('https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=500');
+                        setImgSrc(CONFIG.IMAGE_BLUR_PLACEHOLDER);
                     }}
                 />
             </div>
