@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from '../utils';
+﻿import { fetchWithTimeout } from '../utils';
 import { ApiResponse } from '@/types';
 import { ResourceSite } from '../resources';
 import { CONFIG } from '@/config/config';
@@ -24,6 +24,12 @@ export async function fetchRawFromSource(source: ResourceSite, params: string = 
 
         return JSON.parse(text);
     } catch (error: unknown) {
+        // 处理超时中止错误（AbortError），不抛出，仅警告
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            logger.warn('Fetcher', `请求 ${source.name} 超时（${CONFIG.SEARCH_TIMEOUT}ms），已中止`);
+            return undefined;
+        }
+        // 其他错误正常抛出
         logger.error('Fetcher', `Error fetching from ${source.name}:`, error);
         throw error;
     }
