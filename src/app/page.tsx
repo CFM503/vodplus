@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+﻿import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { HomeSection } from "@/components/home/HomeSection";
 import { HomeSkeleton } from "@/components/home/HomeSkeleton";
@@ -26,25 +26,25 @@ export const fetchCache = "force-no-store";
 const getCachedTrendingMovies = unstable_cache(
   async (s, ds, cul) => getTrendingMovies(s, ds, cul),
   ["trending-movies"],
-  { revalidate: CONFIG.API_REVALIDATE_SECONDS, tags: ["trending"] }
+  { revalidate: CONFIG.TRENDING_REVALIDATE, tags: ["trending"] }
 );
 
 const getCachedTrendingTv = unstable_cache(
   async (s, ds, cul) => getTrendingTv(s, ds, cul),
   ["trending-tv"],
-  { revalidate: CONFIG.API_REVALIDATE_SECONDS, tags: ["trending"] }
+  { revalidate: CONFIG.TRENDING_REVALIDATE, tags: ["trending"] }
 );
 
 const getCachedNewestAction = unstable_cache(
   async (ds, cul) => getNewestAction(ds, cul),
   ["newest-action"],
-  { revalidate: CONFIG.API_REVALIDATE_SECONDS, tags: ["latest"] }
+  { revalidate: CONFIG.CATEGORY_REVALIDATE, tags: ["latest"] }
 );
 
 const getCachedNewestTv = unstable_cache(
   async (ds, cul) => getNewestTv(ds, cul),
   ["newest-tv"],
-  { revalidate: CONFIG.API_REVALIDATE_SECONDS, tags: ["latest"] }
+  { revalidate: CONFIG.CATEGORY_REVALIDATE, tags: ["latest"] }
 );
 
 async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
