@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 全局应用配置文件
  * 集中管理所有硬编码参数，方便统一调优
  */
@@ -80,7 +80,13 @@ export const CONFIG = {
     // 默认起播缓冲长度 (秒)
     // 降低此值可加快起播速度，HLS.js 会在播放中自动继续缓冲更多。
     // 建议: 10 (快速起播) ~ 30 (抗卡顿)
-    DEFAULT_BUFFER_LENGTH: 10,
+    DEFAULT_BUFFER_LENGTH: 10
+
+    // 新增：网络自适应缓冲配置
+    BUFFER_ADAPTIVE: true, // 是否启用自适应缓冲
+    BUFFER_LOW_BW: 5, // 低带宽缓冲长度（秒）
+    BUFFER_HIGH_BW: 20, // 高带宽缓冲长度（秒）
+,
 
     // HLS 分片拉取超时时间 (毫秒)
     // 网络差时建议调大

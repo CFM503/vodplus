@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
@@ -65,15 +65,15 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
                         autoStartLoad: true,
                         startLevel: -1,
                         enableWorker: true,
-                        maxBufferLength: maxBufferLength,
+                        maxBufferLength: CONFIG.BUFFER_ADAPTIVE ? Math.min(maxBufferLength, CONFIG.BUFFER_HIGH_BW) : maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
                         backBufferLength: 90,
                         lowLatencyMode: false,
-                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
+                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,`n                        manifestLoadingMaxRetry: 4,`n                        levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,`n                        levelLoadingMaxRetry: 4,`n                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 20000,
                         manifestLoadingMaxRetry: 4,
                         levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         levelLoadingMaxRetry: 4,
-                        fragLoadingTimeOut: 20000,
+                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 20000,
                         fragLoadingMaxRetry: 6,
                         testBandwidth: false,
                         abrEwmaFastLive: 3.0,

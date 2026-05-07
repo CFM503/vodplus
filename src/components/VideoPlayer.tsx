@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useRef } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
