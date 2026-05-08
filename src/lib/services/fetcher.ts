@@ -12,8 +12,9 @@ export async function fetchRawFromSource(source: ResourceSite, params: string = 
         ? { cache: 'no-store' as RequestCache }
         : { next: { revalidate: CONFIG.API_REVALIDATE_SECONDS } };
 
+    const timeout = CONFIG.SOURCE_TIMEOUT_MAP?.[source.id] || CONFIG.SEARCH_TIMEOUT;
     try {
-        const timeout = CONFIG.SOURCE_TIMEOUT_MAP?.[source.id] || CONFIG.SEARCH_TIMEOUT; const res = await fetchWithTimeout(url, timeout, cacheOptions);
+        const res = await fetchWithTimeout(url, timeout, cacheOptions);
         const text = await res.text();
 
         // Only support JSON responses for Edge Runtime compatibility
