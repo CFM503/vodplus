@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Settings, Gauge, ZoomIn, X, FastForward, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -11,7 +11,7 @@ interface PlayerSettingsPanelProps {
     className?: string;
 }
 
-const PlayerSettingsPanel = React.memo(function PlayerSettingsPanel({ player, onClose, className }: PlayerSettingsPanelProps) {
+export default function PlayerSettingsPanel({ player, onClose, className }: PlayerSettingsPanelProps) {
     const {
         currentLevel,
         levels,

@@ -69,7 +69,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
                         maxMaxBufferLength: maxBufferLength * 2,
                         backBufferLength: 90,
                         lowLatencyMode: false,
-                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,`n                        manifestLoadingMaxRetry: 4,`n                        levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,`n                        levelLoadingMaxRetry: 4,`n                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 20000,
+                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         manifestLoadingMaxRetry: 4,
                         levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         levelLoadingMaxRetry: 4,

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useRef } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
@@ -142,7 +142,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 preload="metadata"
                 crossOrigin="anonymous"
                 muted={isMuted}
-                style={useMemo(() => ({ transform: `scale(${videoScale})`, transformOrigin: 'center center' }), [videoScale])}
+                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center' }}
             />
 
             {/* Loading Spinner */}
