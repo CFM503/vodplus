@@ -142,7 +142,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 preload="metadata"
                 crossOrigin="anonymous"
                 muted={isMuted}
-                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center' }}
+                style={useMemo(() => ({ transform: `scale(${videoScale})`, transformOrigin: 'center center' }), [videoScale])}
             />
 
             {/* Loading Spinner */}
