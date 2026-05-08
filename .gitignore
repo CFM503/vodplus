@@ -55,3 +55,7 @@ next-env.d.ts
 # AI tool configs
 .openclaude/
 .opencode/
+
+# PWA generated files
+public/service-worker.js
+public/workbox-*.js
