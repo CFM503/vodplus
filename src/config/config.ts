@@ -18,7 +18,7 @@ export const CONFIG = {
     // 特定资源源的超时时间（毫秒），未配置的源沿用SEARCH_TIMEOUT
     SOURCE_TIMEOUT_MAP: {
         "hongniu": 15000 // 红牛资源超时设为15秒
-    },
+    } as Record<string, number>,
 
     // 详情页自动匹配时的并发批次大小
     // 例如 3 表示每次同时搜 3 个站。越大速度越快但服务器压力越大。
