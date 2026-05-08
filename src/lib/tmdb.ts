@@ -1,3 +1,4 @@
+// Low-level TMDB API functions. Used by src/lib/metadata/tmdb.ts (TmdbMetadataProvider).
 
 import { Movie } from '@/types';
 import { getThemedPlaceholder, fetchWithTimeout } from './utils';
@@ -92,6 +93,27 @@ export async function getTmdbDiscover(type: 'movie' | 'tv' = 'movie', page: numb
     } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
             logger.warn('TMDB', `Error discovering (${type}) page ${page}:`, error);
+        }
+        return [];
+    }
+}
+
+export async function getTmdbSearch(keyword: string): Promise<Movie[]> {
+    try {
+        const res = await fetchWithTimeout(
+            `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&language=zh-CN&query=${encodeURIComponent(keyword)}&page=1`,
+            3000
+        );
+
+        if (!res.ok) throw new Error(`TMDB API error: ${res.status}`);
+
+        const data = await res.json();
+        return (data.results || [])
+            .filter((item: TmdbItem) => item.media_type === 'movie' || item.media_type === 'tv')
+            .map((item: TmdbItem) => normalizeTmdbToMovie(item, item.media_type as 'movie' | 'tv'));
+    } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+            logger.warn('TMDB', `Error searching "${keyword}":`, error);
         }
         return [];
     }

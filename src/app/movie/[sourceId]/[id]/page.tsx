@@ -1,5 +1,5 @@
 
-import { cachedGetMovieDetail } from '@/lib/api';
+import { cachedGetMovieDetail } from '@/lib/services/vodService';
 import VideoPlayer from '@/components/VideoPlayer';
 import { Header } from '@/components/Header';
 import { notFound, redirect } from 'next/navigation';

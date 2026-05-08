@@ -52,13 +52,18 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
   async headers() {
+    // dev needs 'unsafe-eval' for React Fast Refresh / webpack HMR
+    const scriptSrc = process.env.NODE_ENV === 'development'
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:"
+      : "script-src 'self' 'unsafe-inline' blob:";
+
     return [
       {
         source: '/:path*',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' wsrv.nl weserv.nl image.tmdb.org images.unsplash.com data: blob:; media-src 'self' blob: https: http:; font-src 'self' data:; connect-src 'self' wsrv.nl https: http:;",
+            value: `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; img-src 'self' wsrv.nl weserv.nl image.tmdb.org images.unsplash.com data: blob:; media-src 'self' blob: https: http:; font-src 'self' data:; connect-src 'self' wsrv.nl https: http:; frame-ancestors 'none';`,
           },
         ],
       },

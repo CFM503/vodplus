@@ -133,7 +133,19 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
 
         initPlayer();
 
+        // Visibility handling — tied to HLS lifecycle to avoid listener accumulation
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && hlsRef.current) {
+                hlsRef.current.startLoad();
+                if (videoRef.current && !videoRef.current.paused) {
+                    hlsRef.current.recoverMediaError();
+                }
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (hlsRef.current) {
                 hlsRef.current.destroy();
                 hlsRef.current = null;
@@ -144,25 +156,11 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
     // Update HLS buffer config dynamically
     useEffect(() => {
         if (!hlsRef.current || isEmbed) return;
-        
+
         const hls = hlsRef.current;
         (hls.config as any).maxBufferLength = maxBufferLength;
         (hls.config as any).maxMaxBufferLength = maxBufferLength * 2;
     }, [maxBufferLength, isEmbed]);
-
-    // Visibility handling
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && hlsRef.current) {
-                hlsRef.current.startLoad();
-                if (videoRef.current && !videoRef.current.paused) {
-                    hlsRef.current.recoverMediaError();
-                }
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [isEmbed]);
 
     return {
         hlsRef,

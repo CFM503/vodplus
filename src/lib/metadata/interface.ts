@@ -7,4 +7,5 @@ export interface MetadataProvider {
     getPopular(type: 'movie' | 'tv'): Promise<Movie[]>;
     getDiscover(type: 'movie' | 'tv', page: number): Promise<Movie[]>;
     getDetail(id: string): Promise<any>;
+    search(keyword: string): Promise<Movie[]>;
 }

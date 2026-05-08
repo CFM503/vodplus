@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -31,64 +31,6 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
 
     // Ref to suppress synthetic click/dblclick events originating from touch
     const touchEndTimeRef = useRef(0);
-
-    // Memoized subset APIs for child components
-    const controlsApi = useMemo(() => ({
-        isPlaying: player.isPlaying,
-        togglePlay: player.togglePlay,
-        toggleMute: player.toggleMute,
-        isMuted: player.isMuted,
-        volume: player.volume,
-        handleVolumeChange: player.handleVolumeChange,
-        duration: player.duration,
-        videoRef: player.videoRef,
-        showSettings: player.showSettings,
-        setShowSettings: player.setShowSettings,
-    }), [player.isPlaying, player.togglePlay, player.toggleMute, player.isMuted,
-        player.volume, player.handleVolumeChange, player.duration,
-        player.showSettings, player.setShowSettings]);
-
-    const progressApi = useMemo(() => ({
-        progress: player.progress,
-        duration: player.duration,
-        buffered: player.buffered,
-        isDragging: player.isDragging,
-        dragProgress: player.dragProgress,
-        progressBarRef: player.progressBarRef,
-        handleSeekStart: player.handleSeekStart,
-        handleSeekMove: player.handleSeekMove,
-        handleSeekEnd: player.handleSeekEnd,
-        handleProgressClick: player.handleProgressClick,
-    }), [player.progress, player.duration, player.buffered, player.isDragging,
-        player.dragProgress, player.handleSeekStart, player.handleSeekMove,
-        player.handleSeekEnd, player.handleProgressClick]);
-
-    const settingsApi = useMemo(() => ({
-        currentLevel: player.currentLevel,
-        levels: player.levels,
-        activeLevelIdx: player.activeLevelIdx,
-        playbackRate: player.playbackRate,
-        handleRateChange: player.handleRateChange,
-        videoScale: player.videoScale,
-        handleScaleChange: player.handleScaleChange,
-        maxBufferLength: player.maxBufferLength,
-        handleBufferChange: player.handleBufferChange,
-        handleResolutionChange: player.handleResolutionChange,
-        skipIntroTime: player.skipIntroTime,
-        handleSkipIntroChange: player.handleSkipIntroChange,
-    }), [player.currentLevel, player.levels, player.activeLevelIdx,
-        player.playbackRate, player.handleRateChange, player.videoScale,
-        player.handleScaleChange, player.maxBufferLength, player.handleBufferChange,
-        player.handleResolutionChange, player.handleSkipIntroChange]);
-
-    const buttonsApi = useMemo(() => ({
-        showSettings: player.showSettings,
-        setShowSettings: player.setShowSettings,
-        toggleFullscreen: player.toggleFullscreen,
-        toggleWebFullscreen: player.toggleWebFullscreen,
-        isWebFullscreen: player.isWebFullscreen,
-    }), [player.showSettings, player.setShowSettings, player.toggleFullscreen,
-        player.toggleWebFullscreen, player.isWebFullscreen]);
 
     if (isEmbed) {
         return (

@@ -1,6 +1,6 @@
 import { Movie } from '@/types';
 import { MetadataProvider } from './interface';
-import { getTmdbTrending, getTmdbPopular, getTmdbDiscover, TMDB_API_KEY, TMDB_BASE_URL } from '../tmdb';
+import { getTmdbTrending, getTmdbPopular, getTmdbDiscover, getTmdbSearch, TMDB_API_KEY, TMDB_BASE_URL } from '../tmdb';
 import { logger } from '../logger';
 
 export class TmdbMetadataProvider implements MetadataProvider {
@@ -33,6 +33,15 @@ export class TmdbMetadataProvider implements MetadataProvider {
             return await getTmdbDiscover(type, page);
         } catch (e: unknown) {
             logger.warn('TMDB', `getDiscover(${type}) failed:`, e);
+            return [];
+        }
+    }
+
+    async search(keyword: string): Promise<Movie[]> {
+        try {
+            return await getTmdbSearch(keyword);
+        } catch (e: unknown) {
+            logger.warn('TMDB', `search("${keyword}") failed:`, e);
             return [];
         }
     }

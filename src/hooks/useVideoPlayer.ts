@@ -177,6 +177,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     });
 
     // Toggle play (defined after events since it needs events.setIsPlaying)
+    const setIsPlaying = events.setIsPlaying;
     const togglePlay = useCallback(() => {
         const video = videoRef.current;
         if (!video) return;
@@ -184,12 +185,12 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             video.play().catch(error => {
                 if (error instanceof Error && error.name !== 'AbortError') { /* ignore */ }
             });
-            events.setIsPlaying(true);
+            setIsPlaying(true);
         } else {
             video.pause();
-            events.setIsPlaying(false);
+            setIsPlaying(false);
         }
-    }, []);
+    }, [setIsPlaying]);
 
     // 6. Controls
     const controls = useVideoControls({

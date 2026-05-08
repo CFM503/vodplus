@@ -73,7 +73,9 @@ async function NewestTvSection({ disabledSources, customLocalUrl }: { disabledSo
 
 export default async function Home() {
   const cookieStore = await cookies();
-  const { disabledSources, movieSource, tvSource, customLocalUrl } = await getUserPreferences(cookieStore);
+  const { disabledSources: rawDisabled, movieSource, tvSource, customLocalUrl } = await getUserPreferences(cookieStore);
+  // Sort to ensure deterministic cache keys regardless of cookie order
+  const disabledSources = [...rawDisabled].sort();
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20 selection:bg-indigo-500/30">

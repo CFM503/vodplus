@@ -115,7 +115,7 @@ export function useVideoGestures({
         }
     }, [isEmbed, isSpeedHolding, containerRef, handleVolumeChange, showGestureHUD]);
 
-    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const handleTouchEnd = useCallback((e: React.TouchEvent): boolean => {
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
@@ -125,10 +125,10 @@ export function useVideoGestures({
             handleSpeedHoldEnd();
             touchStartRef.current = null;
             gestureTypeRef.current = 'none';
-            return;
+            return false;
         }
 
-        if (!touchStartRef.current) return;
+        if (!touchStartRef.current) return false;
 
         const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
         const touchDuration = Date.now() - touchStartRef.current.time;

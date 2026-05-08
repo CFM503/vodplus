@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        let list = [];
+        let list: import('@/types').Movie[] = [];
 
         if (sourceId === 'tmdb') {
-            const provider: any = getMetadataProvider('tmdb');
+            const provider = getMetadataProvider('tmdb');
             list = await provider.search(keyword);
         } else {
             const source = RESOURCE_SITES.find(s => s.id === sourceId);

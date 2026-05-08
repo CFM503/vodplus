@@ -11,16 +11,18 @@ import { unstable_cache } from 'next/cache';
 import { logger } from '../logger';
 
 // Request deduplication cache to prevent duplicate simultaneous requests
-const pendingRequests = new Map<string, Promise<any>>();
+const DEDUP_TTL_MS = 5000;
+const pendingRequests = new Map<string, { promise: Promise<any>; ts: number }>();
 
 function dedupFetch<T>(key: string, fetchFn: () => Promise<T>): Promise<T> {
-  if (pendingRequests.has(key)) {
-    return pendingRequests.get(key) as Promise<T>;
+  const entry = pendingRequests.get(key);
+  if (entry && Date.now() - entry.ts < DEDUP_TTL_MS) {
+    return entry.promise as Promise<T>;
   }
   const promise = fetchFn().finally(() => {
     pendingRequests.delete(key);
   });
-  pendingRequests.set(key, promise);
+  pendingRequests.set(key, { promise, ts: Date.now() });
   return promise;
 }
 
@@ -123,11 +125,13 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                 await new Promise<void>((resolve) => {
                     let completed = 0;
                     let found = 0;
+                    let resolved = false;
 
                     if (searchPromises.length === 0) resolve();
 
                     searchPromises.forEach(p => {
                         p.then(result => {
+                            if (resolved) return;
                             completed++;
                             if (result) {
                                 candidates.push(result);
@@ -136,6 +140,7 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
 
                             // Stop waiting if we have enough candidates OR all sources finished
                             if (found >= targetCount || completed === searchPromises.length) {
+                                resolved = true;
                                 resolve();
                             }
                         });

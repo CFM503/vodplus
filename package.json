@@ -1,6 +1,6 @@
 {
   "name": "vodplus",
-  "version": "0.7.8",
+  "version": "0.8.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,8 +16,8 @@
     "hls.js": "^1.6.15",
     "lucide-react": "^0.563.0",
     "next": "^15.5.9",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
@@ -29,7 +29,6 @@
     "eslint": "^9",
     "eslint-config-next": "^15.5.9",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@types/bun": "latest"
+    "typescript": "^5"
   }
 }
