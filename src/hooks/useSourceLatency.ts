@@ -24,12 +24,14 @@ export function useSourceLatency(): UseSourceLatencyReturn {
     const [isProbing, setIsProbing] = useState(false);
     const probeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+    const latenciesRef = useRef<Map<string, LatencyResult>>(new Map());
 
     // Load cached latencies on mount
     useEffect(() => {
         const cached = loadFromCache();
         if (cached.size > 0) {
             setLatencies(cached);
+            latenciesRef.current = cached;
         }
     }, []);
 
@@ -162,15 +164,16 @@ export function useSourceLatency(): UseSourceLatencyReturn {
         });
 
         setLatencies(newLatencies);
+        latenciesRef.current = newLatencies;
         saveToCache(newLatencies);
         setIsProbing(false);
     }, [isProbing, probeSource, saveToCache]);
 
     const getLatency = useCallback((sourceId: string): number => {
-        const result = latencies.get(sourceId);
+        const result = latenciesRef.current.get(sourceId);
         if (!result) return -1;
         return result.latency > 0 ? result.latency : -1;
-    }, [latencies]);
+    }, []);
 
     // Cleanup on unmount
     useEffect(() => {

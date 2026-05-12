@@ -164,6 +164,14 @@ export const CONFIG = {
     // YouTube 默认是红色，但用户想要灰色
     PROGRESS_BAR_HANDLE_COLOR: '#d1d5db',
 
+    // 设置面板自动关闭时间 (毫秒)
+    // 用户停止交互后多久自动关闭设置面板
+    SETTINGS_AUTO_CLOSE_TIME: 3000,
+
+    // 手势 HUD 自动隐藏时间 (毫秒)
+    // 双击快进/快退提示显示多久后自动消失
+    GESTURE_HUD_AUTO_HIDE_TIME: 1000,
+
     // 是否显示视频左上角的集数/标题浮层
     // true: 显示 (默认)
     // false: 隐藏

@@ -5,12 +5,12 @@ import { Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LatencyBadge } from './LatencyBadge';
 import Image from 'next/image';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { CONFIG } from '@/config/config';
 import Link from 'next/link';
 import { parseVodPlayUrl } from '@/lib/vodParser';
 
-export function MovieCard({ movie, className, index = 999 }: { movie: Movie; className?: string; index?: number }) {
+export function MovieCard({ movie, className, index = 999, latency: latencyProp }: { movie: Movie; className?: string; index?: number; latency?: number }) {
     if (!movie) return null;
 
     const isDiscoverySrc = movie.source_id === 'tmdb';
@@ -21,7 +21,7 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
     const [imgSrc, setImgSrc] = useState(movie.vod_pic);
     const hasPrefetchedRef = useRef(false);
 
-    const handlePrefetch = () => {
+    const handlePrefetch = useCallback(() => {
         if (hasPrefetchedRef.current || !movie.source_id || !movie.vod_id || isDiscoverySrc) return;
         hasPrefetchedRef.current = true;
         fetch(`/api/vod/latest?source=${encodeURIComponent(movie.source_id)}&id=${encodeURIComponent(movie.vod_id)}`, {
@@ -41,7 +41,7 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                 }
             })
             .catch(() => { });
-    };
+    }, [movie.source_id, movie.vod_id, isDiscoverySrc]);
 
     return (
         <Link
@@ -86,9 +86,11 @@ export function MovieCard({ movie, className, index = 999 }: { movie: Movie; cla
                     </div>
                 )}
 
-                {movie.latency !== undefined && (
+                {(latencyProp !== undefined && latencyProp > 0) ? (
+                    <LatencyBadge latency={latencyProp} />
+                ) : movie.latency !== undefined ? (
                     <LatencyBadge latency={movie.latency} />
-                )}
+                ) : null}
             </div>
 
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">

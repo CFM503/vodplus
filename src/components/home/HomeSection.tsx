@@ -1,6 +1,13 @@
 import { Movie } from '@/types';
 import { MovieCard } from '@/components/MovieCard';
 
+const ICON_COLOR_MAP: Record<string, string> = {
+    indigo: 'from-indigo-500',
+    orange: 'from-orange-500',
+    emerald: 'from-emerald-500',
+    pink: 'from-pink-500',
+};
+
 interface HomeSectionProps {
     title: string;
     list: Movie[];
@@ -15,7 +22,7 @@ export function HomeSection({ title, list, link = '#', iconColor = 'indigo' }: H
         <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl md:text-3xl font-bold text-white flex items-center">
-                    <span className={`w-1.5 h-8 bg-gradient-to-b from-${iconColor}-500 to-cyan-400 rounded-full mr-4 shadow-[0_0_10px_rgba(99,102,241,0.5)]`}></span>
+                    <span className={`w-1.5 h-8 bg-gradient-to-b ${ICON_COLOR_MAP[iconColor] || 'from-indigo-500'} to-cyan-400 rounded-full mr-4 shadow-[0_0_10px_rgba(99,102,241,0.5)]`}></span>
                     {title}
                 </h2>
             </div>

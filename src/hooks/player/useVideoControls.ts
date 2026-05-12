@@ -99,6 +99,16 @@ export function useVideoControls({
         if (!isHovering) setShowSettings(false);
     }, [isHovering, setShowSettings]);
 
+    // Auto-close settings panel after inactivity
+    useEffect(() => {
+        if (!showSettings) return;
+        const timeout = setTimeout(() => {
+            setShowSettings(false);
+            setIsHovering(false);
+        }, CONFIG.SETTINGS_AUTO_CLOSE_TIME);
+        return () => clearTimeout(timeout);
+    }, [showSettings, isHovering, setShowSettings]);
+
     return {
         isHovering,
         setIsHovering,

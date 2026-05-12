@@ -30,23 +30,23 @@ export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Ep
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
 
-    const handleEpisodeEnd = () => {
+    const handleEpisodeEnd = useCallback(() => {
         if (hasNext) {
-            setCurrentEpIndex(currentEpIndex + 1);
+            setCurrentEpIndex(prev => prev + 1);
         }
-    };
+    }, [hasNext]);
 
-    const handlePrevEpisode = () => {
+    const handlePrevEpisode = useCallback(() => {
         if (hasPrev) {
-            setCurrentEpIndex(currentEpIndex - 1);
+            setCurrentEpIndex(prev => prev - 1);
         }
-    };
+    }, [hasPrev]);
 
-    const handleNextEpisode = () => {
+    const handleNextEpisode = useCallback(() => {
         if (hasNext) {
-            setCurrentEpIndex(currentEpIndex + 1);
+            setCurrentEpIndex(prev => prev + 1);
         }
-    };
+    }, [hasNext]);
 
     const handleJumpToEpisode = useCallback((idx: number) => {
         setCurrentEpIndex(idx);

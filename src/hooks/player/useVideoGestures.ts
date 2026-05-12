@@ -35,12 +35,21 @@ export function useVideoGestures({
     const gestureTypeRef = useRef<'none' | 'vertical-left' | 'vertical-right' | 'horizontal'>('none');
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const lastMousePosRef = useRef({ x: 0, y: 0 });
+    const gestureHUDTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const showGestureHUD = useCallback((icon: 'volume' | 'brightness' | 'seek', value: string) => {
+        if (gestureHUDTimerRef.current) clearTimeout(gestureHUDTimerRef.current);
         setGestureHUD({ icon, value, visible: true });
+        gestureHUDTimerRef.current = setTimeout(() => {
+            setGestureHUD(prev => ({ ...prev, visible: false }));
+        }, CONFIG.GESTURE_HUD_AUTO_HIDE_TIME);
     }, []);
 
     const hideGestureHUD = useCallback(() => {
+        if (gestureHUDTimerRef.current) {
+            clearTimeout(gestureHUDTimerRef.current);
+            gestureHUDTimerRef.current = null;
+        }
         setGestureHUD(prev => ({ ...prev, visible: false }));
     }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, startTransition } from 'react';
 import { Movie } from '@/types';
 import { MovieCard } from '@/components/MovieCard';
 import { Loader2, SearchX, AlertCircle, Radio, Calendar } from 'lucide-react';
@@ -87,30 +87,25 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
 
                     // Append unique results
                     if (list.length > 0) {
-                        // Use transition to prioritize UI responsiveness
-                        // This prevents typing lag or scroll stutter during rapid updates
-                        import('react').then(({ startTransition }) => {
-                            startTransition(() => {
-                                setResults(prev => {
-                                    const newItems: Movie[] = [];
-                                    // Use source_id in key if deduplication is disabled
-                                    const getKey = (m: Movie) => {
-                                        const base = `${m.vod_name}-${m.vod_year || ''}`.toLowerCase().trim();
-                                        return CONFIG.SEARCH_DEDUPLICATE ? base : `${base}-${m.source_id}`;
-                                    };
+                        startTransition(() => {
+                            setResults(prev => {
+                                const newItems: Movie[] = [];
+                                const getKey = (m: Movie) => {
+                                    const base = `${m.vod_name}-${m.vod_year || ''}`.toLowerCase().trim();
+                                    return CONFIG.SEARCH_DEDUPLICATE ? base : `${base}-${m.source_id}`;
+                                };
 
-                                    const seen = new Set(prev.map(m => getKey(m)));
+                                const seen = new Set(prev.map(m => getKey(m)));
 
-                                    list.forEach((item: Movie) => {
-                                        const key = getKey(item);
-                                        if (!seen.has(key)) {
-                                            seen.add(key);
-                                            newItems.push(item);
-                                        }
-                                    });
-
-                                    return [...prev, ...newItems];
+                                list.forEach((item: Movie) => {
+                                    const key = getKey(item);
+                                    if (!seen.has(key)) {
+                                        seen.add(key);
+                                        newItems.push(item);
+                                    }
                                 });
+
+                                return [...prev, ...newItems];
                             });
                         });
                     }
@@ -163,19 +158,6 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
         }
     }, [results, keyword]);
 
-
-    // Merge latency data into results for display
-    useEffect(() => {
-        if (results.length > 0 && latencies.size > 0) {
-            setResults(prev => prev.map(movie => {
-                const latency = getLatency(movie.source_id || '');
-                return {
-                    ...movie,
-                    latency: latency > 0 ? latency : movie.latency
-                };
-            }));
-        }
-    }, [latencies, getLatency]);
 
     // Year filter state
     const [selectedYear, setSelectedYear] = useState<string>('all');
@@ -283,7 +265,7 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
             {filteredCount > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 mb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {filteredResults.map((movie, idx) => (
-                        <MovieCard key={`${movie.vod_id}-${movie.source_id}-${idx}`} movie={movie} />
+                        <MovieCard key={`${movie.vod_id}-${movie.source_id}-${idx}`} movie={movie} latency={getLatency(movie.source_id || '')} />
                     ))}
                 </div>
             )}
