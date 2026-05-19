@@ -104,16 +104,16 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
         if (rafRef.current !== null) {
             cancelAnimationFrame(rafRef.current);
         }
-        
+
         rafRef.current = requestAnimationFrame(() => {
             const percent = getPercentFromClientX(e.clientX);
-            
+
             // 只在变化超过阈值时更新
             if (Math.abs(percent - dragPercentRef.current) < 0.5) return;
-            
+
+            // During drag, dragPercent drives both progress bar and tooltip — skip redundant hoverProgress update
             setDragPercent(percent);
             dragPercentRef.current = percent;
-            setHoverProgress(percent);
             handleSeekMove(percent);
         });
 

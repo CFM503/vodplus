@@ -3,18 +3,33 @@ import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
 
+// Cache the HLS constructor across URL changes to avoid re-importing
+let cachedHlsConstructor: typeof Hls | null = null;
+let hlsImportPromise: Promise<typeof Hls> | null = null;
+
+async function getHlsConstructor(): Promise<typeof Hls> {
+    if (cachedHlsConstructor) return cachedHlsConstructor;
+    if (!hlsImportPromise) {
+        hlsImportPromise = import('hls.js').then(mod => {
+            cachedHlsConstructor = mod.default;
+            return mod.default;
+        });
+    }
+    return hlsImportPromise;
+}
+
 interface UseHlsSourceProps {
     url: string;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     isEmbed: boolean;
     maxBufferLength: number;
+    skipIntroTimeRef: React.RefObject<number>;
 }
 
-export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHlsSourceProps) {
+export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef }: UseHlsSourceProps) {
     const hlsRef = useRef<InstanceType<typeof Hls> | null>(null);
     const hasSkippedIntroRef = useRef(false);
     const hasPrefetchedNextRef = useRef(false);
-    const skipIntroTimeRef = useRef(0);
 
     const [isLoading, setIsLoading] = useState(true);
     const [levels, setLevels] = useState<{ height: number; index: number }[]>([]);
@@ -43,14 +58,6 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
         manifestParsedRef.current = false;
         mediaAttachedRef.current = false;
 
-        // Load skip intro time from session storage
-        if (typeof window !== 'undefined') {
-            const saved = sessionStorage.getItem('VOD_SESSION_SKIP_INTRO');
-            if (saved) {
-                skipIntroTimeRef.current = parseInt(saved, 10);
-            }
-        }
-
         const video = videoRef.current;
         if (!video || isEmbed) return;
 
@@ -63,7 +70,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
             }
 
             try {
-                const { default: Hls } = await import('hls.js');
+                const Hls = await getHlsConstructor();
 
                 if (Hls.isSupported()) {
                     if (hlsRef.current) hlsRef.current.destroy();
@@ -192,7 +199,6 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
         activeLevelIdx,
         isEmbed,
         maxBufferLength,
-        skipIntroTimeRef,
         hasSkippedIntroRef,
         hasPrefetchedNextRef,
     };

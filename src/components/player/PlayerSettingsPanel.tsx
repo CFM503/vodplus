@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Settings, Gauge, ZoomIn, FastForward, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -107,33 +107,45 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
         handleSkipIntroChange(next);
     }, [localSkipTime, handleSkipIntroChange]);
 
-    const getQualityLabel = () => currentLevel === -1 ? '自动' : `${levels.find(l => l.index === currentLevel)?.height || '?'}p`;
-    const getSpeedLabel = () => `${playbackRate}x`;
-    const getScaleLabel = () => videoScale === 1 ? '默认' : `${videoScale}x`;
-    const getBufferLabel = () => {
+    // Memoized label computations — only recalculate when dependencies change
+    const qualityLabel = useMemo(() => {
+        if (currentLevel === -1) return '自动';
+        return `${levels.find(l => l.index === currentLevel)?.height || '?'}p`;
+    }, [currentLevel, levels]);
+
+    const speedLabel = useMemo(() => `${playbackRate}x`, [playbackRate]);
+
+    const scaleLabel = useMemo(() => videoScale === 1 ? '默认' : `${videoScale}x`, [videoScale]);
+
+    const bufferLabel = useMemo(() => {
         const map: Record<number, string> = { 10: '极速', 30: '平衡', 60: '流畅', 120: '抗断网', 180: '超级流畅' };
         return map[maxBufferLength] || `${maxBufferLength}s`;
-    };
-    const getSkipIntroLabel = () => localSkipTime === 0 ? '关闭' : `${localSkipTime}s`;
+    }, [maxBufferLength]);
+
+    const skipIntroLabel = useMemo(() => localSkipTime === 0 ? '关闭' : `${localSkipTime}s`, [localSkipTime]);
+
+    const handleCloseClick = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+    }, [onClose]);
+
+    const stopPropagation = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
 
     return (
         <div
             className={cn("bg-slate-900 rounded-lg shadow-xl border border-white/10 text-left w-72 overflow-hidden", className)}
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
+            onClick={stopPropagation}
+            onTouchStart={stopPropagation}
+            onTouchMove={stopPropagation}
+            onTouchEnd={stopPropagation}
         >
             {/* Panel Header */}
             {!activeSubMenu && (
                 <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/10">
                     <span className="text-sm font-bold text-white">设置</span>
                     <button
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onClose();
-                        }}
+                        onClick={handleCloseClick}
                         className="p-1.5 rounded-full transition-colors cursor-pointer"
                     >
                         <X className="w-5 h-5 text-slate-400" />
@@ -149,32 +161,32 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                             <MenuItem
                                 icon={Settings}
                                 label="清晰度"
-                                value={getQualityLabel()}
+                                value={qualityLabel}
                                 onClick={() => setActiveSubMenu('quality')}
                             />
                         )}
                         <MenuItem
                             icon={Gauge}
                             label="播放速度"
-                            value={getSpeedLabel()}
+                            value={speedLabel}
                             onClick={() => setActiveSubMenu('speed')}
                         />
                         <MenuItem
                             icon={ZoomIn}
                             label="画面缩放"
-                            value={getScaleLabel()}
+                            value={scaleLabel}
                             onClick={() => setActiveSubMenu('scale')}
                         />
                         <MenuItem
                             icon={HardDrive}
                             label="缓存策略"
-                            value={getBufferLabel()}
+                            value={bufferLabel}
                             onClick={() => setActiveSubMenu('buffer')}
                         />
                         <MenuItem
                             icon={FastForward}
                             label="跳过片头"
-                            value={getSkipIntroLabel()}
+                            value={skipIntroLabel}
                             onClick={() => setActiveSubMenu('skipIntro')}
                         />
                     </div>

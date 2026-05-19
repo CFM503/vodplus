@@ -9,6 +9,16 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+/**
+ * Hook: creates a stable ref that always points to the latest value.
+ * Allows callbacks to read current state without being in the dependency array.
+ */
+function useLatestRef<T>(value: T): React.MutableRefObject<T> {
+    const ref = useRef(value);
+    ref.current = value;
+    return ref;
+}
+
 // ===========================
 // 配置常量
 // ===========================
@@ -79,10 +89,14 @@ export function usePCMouseEnter(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback(() => {
-        actions.setIsHovering(true);
-        resetHideTimer(refs.hideTimerRef, state.isPlaying, state.showSettings, actions.setIsHovering);
-    }, [state.isPlaying, state.showSettings, actions.setIsHovering]);
+        const { isPlaying, showSettings } = stateRef.current;
+        const { setIsHovering } = actionsRef.current;
+        setIsHovering(true);
+        resetHideTimer(refs.hideTimerRef, isPlaying, showSettings, setIsHovering);
+    }, []); // stable — reads latest via refs
 }
 
 /**
@@ -92,11 +106,13 @@ export function usePCMouseLeave(
     state: PlayerControlState,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback(() => {
-        if (!state.showSettings) {
-            actions.setIsHovering(false);
+        if (!stateRef.current.showSettings) {
+            actionsRef.current.setIsHovering(false);
         }
-    }, [state.showSettings, actions.setIsHovering]);
+    }, []); // stable
 }
 
 /**
@@ -107,12 +123,16 @@ export function usePCMouseMove(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback((e: React.MouseEvent) => {
-        actions.handleMouseMove?.(e);
-        if (state.showSettings) return;
-        actions.setIsHovering(true);
-        resetHideTimer(refs.hideTimerRef, state.isPlaying, state.showSettings, actions.setIsHovering);
-    }, [state.isPlaying, state.showSettings, actions.setIsHovering, actions.handleMouseMove]);
+        const { isPlaying, showSettings } = stateRef.current;
+        const { handleMouseMove, setIsHovering } = actionsRef.current;
+        handleMouseMove?.(e);
+        if (showSettings) return;
+        setIsHovering(true);
+        resetHideTimer(refs.hideTimerRef, isPlaying, showSettings, setIsHovering);
+    }, []); // stable
 }
 
 /**
@@ -124,11 +144,15 @@ export function usePCControlsHover(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback(() => {
-        if (state.showSettings) return;
-        actions.setIsHovering(true);
-        resetHideTimer(refs.hideTimerRef, state.isPlaying, state.showSettings, actions.setIsHovering);
-    }, [state.isPlaying, state.showSettings, actions.setIsHovering]);
+        const { isPlaying, showSettings } = stateRef.current;
+        const { setIsHovering } = actionsRef.current;
+        if (showSettings) return;
+        setIsHovering(true);
+        resetHideTimer(refs.hideTimerRef, isPlaying, showSettings, setIsHovering);
+    }, []); // stable
 }
 
 /**
@@ -139,12 +163,14 @@ export function usePCVideoClick(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
-    return useCallback((e: React.MouseEvent) => {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
+    return useCallback(() => {
         if (Date.now() - refs.touchEndTimeRef.current < PLAYER_CONTROL_CONFIG.TOUCH_CLICK_SUPPRESSION_DELAY) return;
-        if (!state.showSettings) {
-            actions.togglePlay();
+        if (!stateRef.current.showSettings) {
+            actionsRef.current.togglePlay();
         }
-    }, [state.showSettings, actions.togglePlay]);
+    }, []); // stable
 }
 
 /**
@@ -155,12 +181,14 @@ export function usePCVideoDoubleClick(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
-    return useCallback((e: React.MouseEvent) => {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
+    return useCallback(() => {
         if (Date.now() - refs.touchEndTimeRef.current < PLAYER_CONTROL_CONFIG.TOUCH_CLICK_SUPPRESSION_DELAY) return;
-        if (!state.showSettings) {
-            actions.toggleFullscreen();
+        if (!stateRef.current.showSettings) {
+            actionsRef.current.toggleFullscreen();
         }
-    }, [state.showSettings, actions.toggleFullscreen]);
+    }, []); // stable
 }
 
 /**
@@ -170,11 +198,13 @@ export function usePCSettingsToggle(
     state: PlayerControlState,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback((e: React.MouseEvent | React.TouchEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        actions.setShowSettings(!state.showSettings);
-    }, [state.showSettings, actions.setShowSettings]);
+        actionsRef.current.setShowSettings(!stateRef.current.showSettings);
+    }, []); // stable
 }
 
 /**
@@ -244,10 +274,11 @@ export function useMobileTouchEnd(
     refs: PlayerControlRefs,
     actions: PlayerControlActions
 ) {
+    const actionsRef = useLatestRef(actions);
     return useCallback((e: React.TouchEvent) => {
         refs.touchEndTimeRef.current = Date.now();
-        actions.handleTouchEnd?.(e);
-    }, [actions.handleTouchEnd]);
+        actionsRef.current.handleTouchEnd?.(e);
+    }, []); // stable
 }
 
 /**
@@ -262,6 +293,8 @@ export function useMobileVideoTouch(
     state: PlayerControlState
 ) {
     const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
 
     // 触摸开始时检测双击
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -281,24 +314,25 @@ export function useMobileVideoTouch(
             const x = e.changedTouches[0].clientX;
             const relativeX = x - rect.left;
 
+            const { handleSeekRelative, showGestureHUD, togglePlay } = actionsRef.current;
             if (relativeX < rect.width * PLAYER_CONTROL_CONFIG.DOUBLE_TAP_SKIP_ZONE_PERCENT) {
                 // 左边缘 → 快退
-                actions.handleSeekRelative(-PLAYER_CONTROL_CONFIG.SKIP_SECONDS);
-                actions.showGestureHUD('seek', `-${PLAYER_CONTROL_CONFIG.SKIP_SECONDS}s`);
+                handleSeekRelative(-PLAYER_CONTROL_CONFIG.SKIP_SECONDS);
+                showGestureHUD('seek', `-${PLAYER_CONTROL_CONFIG.SKIP_SECONDS}s`);
             } else if (relativeX > rect.width * (1 - PLAYER_CONTROL_CONFIG.DOUBLE_TAP_SKIP_ZONE_PERCENT)) {
                 // 右边缘 → 快进
-                actions.handleSeekRelative(PLAYER_CONTROL_CONFIG.SKIP_SECONDS);
-                actions.showGestureHUD('seek', `+${PLAYER_CONTROL_CONFIG.SKIP_SECONDS}s`);
+                handleSeekRelative(PLAYER_CONTROL_CONFIG.SKIP_SECONDS);
+                showGestureHUD('seek', `+${PLAYER_CONTROL_CONFIG.SKIP_SECONDS}s`);
             } else {
                 // 中间 → 播放/暂停
-                actions.togglePlay();
+                togglePlay();
             }
         }
 
         // 注意：不在这里写 lastTapRef！必须在 handleTouchEnd 中写入，
         // 否则 handleTouchEnd 读取时 timeSinceLastTap = 触摸持续时间（~100ms），
         // 永远 < 300ms，导致 isDoubleTap 恒为 true，单击处理永远不会执行。
-    }, [actions.handleSeekRelative, actions.showGestureHUD, actions.togglePlay]);
+    }, []); // stable
 
     // 触摸结束时处理单击（延迟执行以避免与双击冲突）
     const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -317,19 +351,17 @@ export function useMobileVideoTouch(
         // 记录本次触摸结束时间，供下次双击检测使用
         refs.lastTapRef.current = now;
 
-        if (!isDoubleTap && !state.showSettings) {
+        if (!isDoubleTap && !stateRef.current.showSettings) {
             // Delayed single-tap: toggle controls visibility (not play/pause)
             pendingTimerRef.current = setTimeout(() => {
                 // 使用函数式更新避免闭包中 isHovering 过期
-                actions.setIsHovering(prev => !prev);
+                actionsRef.current.setIsHovering(prev => !prev);
             }, PLAYER_CONTROL_CONFIG.DOUBLE_TAP_DELAY);
         }
 
         // Forward to gesture handler for long-press cleanup and gesture state reset.
-        // The gesture handler's tap detection returns a boolean but is called as an event handler,
-        // so its return value is ignored - it does NOT trigger play/pause here.
-        actions.handleTouchEnd?.(e);
-    }, [state.showSettings, actions.setIsHovering, actions.handleTouchEnd]);
+        actionsRef.current.handleTouchEnd?.(e);
+    }, []); // stable
 
     // Cleanup
     useEffect(() => {
@@ -348,11 +380,13 @@ export function useMobileSettingsToggle(
     state: PlayerControlState,
     actions: PlayerControlActions
 ) {
+    const stateRef = useLatestRef(state);
+    const actionsRef = useLatestRef(actions);
     return useCallback((e: React.TouchEvent | React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        actions.setShowSettings(!state.showSettings);
-    }, [state.showSettings, actions.setShowSettings]);
+        actionsRef.current.setShowSettings(!stateRef.current.showSettings);
+    }, []); // stable
 }
 
 /**
@@ -361,9 +395,10 @@ export function useMobileSettingsToggle(
 export function useMobileCloseSettingsOnBackdrop(
     actions: PlayerControlActions
 ) {
+    const actionsRef = useLatestRef(actions);
     return useCallback(() => {
-        actions.setShowSettings(false);
-    }, [actions.setShowSettings]);
+        actionsRef.current.setShowSettings(false);
+    }, []); // stable
 }
 
 // ===========================

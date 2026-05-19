@@ -51,10 +51,21 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         }
         return 1;
     });
+    const [skipIntroTime, setSkipIntroTime] = useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = sessionStorage.getItem("VOD_SESSION_SKIP_INTRO");
+            if (saved) return parseInt(saved, 10);
+        }
+        return 0;
+    });
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
     const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
     const isEmbed = url ? (!url.includes('.m3u8') && !url.includes('.mp4') && !url.includes('.webm') && url.startsWith('http')) : false;
+
+    // Ref mirror of skipIntroTime for useHlsSource (which needs a ref for its effect closures)
+    const skipIntroTimeRef = useRef(skipIntroTime);
+    skipIntroTimeRef.current = skipIntroTime;
 
     // ===========================
     // Cross-cutting callbacks (defined before sub-hooks)
@@ -111,13 +122,14 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     // ===========================
 
     // 1. HLS Source
-    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength });
+    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef });
 
     // 2. Settings
     const settings = useVideoSettings({
         hlsRef: hlsSource.hlsRef,
         isEmbed,
-        skipIntroTimeRef: hlsSource.skipIntroTimeRef,
+        skipIntroTime,
+        setSkipIntroTime,
         videoRef,
         playbackRate,
         setPlaybackRate,
@@ -222,19 +234,25 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         volume,
     });
 
-    // Persist videoScale to sessionStorage
+    // Persist player settings to sessionStorage
     useEffect(() => {
         if (typeof window !== "undefined") {
             sessionStorage.setItem("VOD_VIDEO_SCALE", videoScale.toString());
         }
     }, [videoScale]);
 
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("VOD_SESSION_SKIP_INTRO", skipIntroTime.toString());
+        }
+    }, [skipIntroTime]);
+
     // Skip intro effect
     useEffect(() => {
         const video = videoRef.current;
         if (!video || hlsSource.isLoading || hlsSource.hasSkippedIntroRef.current) return;
 
-        const target = hlsSource.skipIntroTimeRef.current;
+        const target = skipIntroTimeRef.current;
         if (target <= 0) {
             hlsSource.hasSkippedIntroRef.current = true;
             return;
@@ -316,7 +334,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         gestureHUD: gestures.gestureHUD,
         toast,
         levels: hlsSource.levels,
-        skipIntroTime: hlsSource.skipIntroTimeRef,
+        skipIntroTime: skipIntroTimeRef,
         handleSkipIntroChange: settings.handleSkipIntroChange,
         currentLevel: hlsSource.currentLevel,
         activeLevelIdx: hlsSource.activeLevelIdx,

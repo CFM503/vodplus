@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type Hls from 'hls.js';
-import { CONFIG } from '@/config/config';
 
 interface UseVideoSettingsProps {
     hlsRef: React.RefObject<InstanceType<typeof Hls> | null>;
     isEmbed: boolean;
-    skipIntroTimeRef: React.RefObject<number>;
+    skipIntroTime: number;
+    setSkipIntroTime: React.Dispatch<React.SetStateAction<number>>;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     playbackRate: number;
     setPlaybackRate: (rate: number) => void;
@@ -17,7 +17,7 @@ interface UseVideoSettingsProps {
 }
 
 export function useVideoSettings({
-    hlsRef, isEmbed, skipIntroTimeRef, videoRef,
+    hlsRef, isEmbed, skipIntroTime, setSkipIntroTime, videoRef,
     playbackRate, setPlaybackRate, videoScale, setVideoScale, showToast,
     maxBufferLength, setMaxBufferLength,
 }: UseVideoSettingsProps) {
@@ -52,11 +52,9 @@ export function useVideoSettings({
 
     const handleSkipIntroChange = useCallback((seconds: number) => {
         const next = Math.max(0, seconds);
-        skipIntroTimeRef.current = next;
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('VOD_SESSION_SKIP_INTRO', next.toString());
-        }
-    }, [skipIntroTimeRef]);
+        setSkipIntroTime(next);
+        // sessionStorage persistence is handled by useVideoPlayer
+    }, [setSkipIntroTime]);
 
     return {
         showSettings,

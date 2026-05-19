@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { RESOURCE_SITES } from '@/lib/resources';
@@ -42,10 +42,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }
     };
 
-    const filteredSources = RESOURCE_SITES.filter(s =>
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSources = useMemo(() => {
+        if (!searchTerm) return RESOURCE_SITES;
+        const lower = searchTerm.toLowerCase();
+        return RESOURCE_SITES.filter(s =>
+            s.name.toLowerCase().includes(lower) ||
+            s.id.toLowerCase().includes(lower)
+        );
+    }, [searchTerm]);
 
     if (!isOpen || !mounted) return null;
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Settings, Maximize, Minimize } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -24,13 +24,29 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         ? "p-2 rounded-full hover:bg-white/10 active:scale-95 transition-all"
         : "p-1 hover:scale-110 transition-transform hover:text-indigo-400";
 
-    const handleSettingsClick = (e: React.MouseEvent | React.TouchEvent) => {
+    const handleSettingsClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (onSettingsToggle) {
-            onSettingsToggle(e);
-        }
-    };
+        onSettingsToggle?.(e);
+    }, [onSettingsToggle]);
+
+    const handleWebFullscreenClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleWebFullscreen();
+    }, [toggleWebFullscreen]);
+
+    const handleFullscreenTouchEnd = useCallback((e: React.TouchEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleFullscreen();
+    }, [toggleFullscreen]);
+
+    const handleFullscreenClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleFullscreen();
+    }, [toggleFullscreen]);
+
+    const stopPropagation = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
 
     return (
         <div className={cn("flex items-center", variant === 'desktop' ? "gap-4" : "gap-1")}>
@@ -38,7 +54,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
             <div className="relative">
                 <button
                     data-settings-toggle
-                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchStart={stopPropagation}
                     onTouchEnd={handleSettingsClick}
                     onClick={handleSettingsClick}
                     className={cn(
@@ -56,10 +72,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
             {/* Web Fullscreen (Desktop Only) */}
             {variant === 'desktop' && (
                 <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        toggleWebFullscreen();
-                    }}
+                    onClick={handleWebFullscreenClick}
                     className={btnClass}
                     title="网页全屏"
                 >
@@ -72,16 +85,9 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
 
             {/* Fullscreen */}
             <button
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    toggleFullscreen();
-                }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFullscreen();
-                }}
+                onTouchStart={stopPropagation}
+                onTouchEnd={handleFullscreenTouchEnd}
+                onClick={handleFullscreenClick}
                 className={cn(btnClass, "shrink-0")}
                 title="全屏"
             >

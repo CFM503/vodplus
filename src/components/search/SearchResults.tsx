@@ -80,14 +80,14 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
                     if (isCancelled) return;
                     const list = data.list || [];
 
-                    // Update statuses
-                    setStatuses(prev => prev.map(s =>
-                        s.id === source.id ? { ...s, status: 'success', count: list.length } : s
-                    ));
+                    // Batch status + result updates in a single transition
+                    startTransition(() => {
+                        setStatuses(prev => prev.map(s =>
+                            s.id === source.id ? { ...s, status: 'success', count: list.length } : s
+                        ));
 
-                    // Append unique results
-                    if (list.length > 0) {
-                        startTransition(() => {
+                        // Append unique results
+                        if (list.length > 0) {
                             setResults(prev => {
                                 const newItems: Movie[] = [];
                                 const getKey = (m: Movie) => {
@@ -107,14 +107,16 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
 
                                 return [...prev, ...newItems];
                             });
-                        });
-                    }
+                        }
+                    });
                 })
                 .catch(err => {
                     if (err.name !== 'AbortError' && !isCancelled) {
-                        setStatuses(prev => prev.map(s =>
-                            s.id === source.id ? { ...s, status: 'error', count: 0 } : s
-                        ));
+                        startTransition(() => {
+                            setStatuses(prev => prev.map(s =>
+                                s.id === source.id ? { ...s, status: 'error', count: 0 } : s
+                            ));
+                        });
                     }
                 })
                 .finally(() => {

@@ -20,11 +20,15 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
 
     const [imgSrc, setImgSrc] = useState(movie.vod_pic);
     const hasPrefetchedRef = useRef(false);
+    // Stable refs for movie identity — avoids recreating handlePrefetch on list re-renders
+    const movieIdRef = useRef({ source_id: movie.source_id, vod_id: movie.vod_id, isDiscoverySrc });
+    movieIdRef.current = { source_id: movie.source_id, vod_id: movie.vod_id, isDiscoverySrc };
 
     const handlePrefetch = useCallback(() => {
-        if (hasPrefetchedRef.current || !movie.source_id || !movie.vod_id || isDiscoverySrc) return;
+        const { source_id, vod_id, isDiscoverySrc: isDisc } = movieIdRef.current;
+        if (hasPrefetchedRef.current || !source_id || !vod_id || isDisc) return;
         hasPrefetchedRef.current = true;
-        fetch(`/api/vod/latest?source=${encodeURIComponent(movie.source_id)}&id=${encodeURIComponent(movie.vod_id)}`, {
+        fetch(`/api/vod/latest?source=${encodeURIComponent(source_id)}&id=${encodeURIComponent(vod_id)}`, {
             priority: 'low',
             cache: 'force-cache'
         })

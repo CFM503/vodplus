@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { PlayCircle, Loader2 } from 'lucide-react';
@@ -61,17 +61,21 @@ export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Ep
     const totalEpisodes = episodes.length;
     const shouldWindow = totalEpisodes > EPISODE_WINDOW * 2;
 
-    let windowStart = 0;
-    let windowEnd = totalEpisodes;
+    const { windowStart, windowEnd, visibleEpisodes } = useMemo(() => {
+        let start = 0;
+        let end = totalEpisodes;
 
-    if (shouldWindow) {
-        windowStart = Math.max(0, currentEpIndex - EPISODE_WINDOW);
-        windowEnd = Math.min(totalEpisodes, currentEpIndex + EPISODE_WINDOW + 1);
-    }
+        if (shouldWindow) {
+            start = Math.max(0, currentEpIndex - EPISODE_WINDOW);
+            end = Math.min(totalEpisodes, currentEpIndex + EPISODE_WINDOW + 1);
+        }
 
-    const visibleEpisodes = shouldWindow
-        ? episodes.slice(windowStart, windowEnd).map((ep, i) => ({ ...ep, originalIdx: windowStart + i }))
-        : episodes.map((ep, i) => ({ ...ep, originalIdx: i }));
+        const visible = shouldWindow
+            ? episodes.slice(start, end).map((ep, i) => ({ ...ep, originalIdx: start + i }))
+            : episodes.map((ep, i) => ({ ...ep, originalIdx: i }));
+
+        return { windowStart: start, windowEnd: end, visibleEpisodes: visible };
+    }, [episodes, currentEpIndex, totalEpisodes, shouldWindow]);
 
     return (
         <div className="space-y-6">

@@ -93,8 +93,14 @@ export function useVideoEvents({
             }
         };
 
+        // Throttle progress updates with rAF to avoid ~4 re-renders/sec from timeupdate
+        let progressRafId: number | null = null;
         const updateProgress = () => {
-            if (video.duration) {
+            if (progressRafId !== null) return; // already scheduled
+            progressRafId = requestAnimationFrame(() => {
+                progressRafId = null;
+                if (!video.duration) return;
+
                 const currentProgressPercent = (video.currentTime / video.duration) * 100;
                 setProgressState(currentProgressPercent);
                 updateBuffered();
@@ -117,7 +123,7 @@ export function useVideoEvents({
                         }
                     }
                 }
-            }
+            });
         };
 
         const updateDuration = () => setDuration(video.duration);
@@ -149,6 +155,7 @@ export function useVideoEvents({
         video.addEventListener('ended', handleEnded);
 
         return () => {
+            if (progressRafId !== null) cancelAnimationFrame(progressRafId);
             video.removeEventListener('timeupdate', updateProgress);
             video.removeEventListener('progress', updateBuffered);
             video.removeEventListener('loadedmetadata', updateDuration);

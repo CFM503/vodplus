@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -57,37 +57,38 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     const lastTapRef = useRef(0);
     const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // State
-    const state: PlayerControlState = {
+    // Memoized State — stable reference unless values change
+    const state: PlayerControlState = useMemo(() => ({
         isPlaying,
         isHovering,
         showSettings,
         isDragging: player.isDragging,
-    };
+    }), [isPlaying, isHovering, showSettings, player.isDragging]);
 
-    // Refs
-    const refs: PlayerControlRefs = {
+    // Refs — all are stable ref objects, never change
+    const refs: PlayerControlRefs = useMemo(() => ({
         containerRef,
         settingsPanelRef: pcSettingsPanelRef,
         mobileSettingsPanelRef,
         touchEndTimeRef,
         lastTapRef,
         hideTimerRef,
-    };
+    }), []); // refs are stable by definition
 
-    // Actions
-    const actions: PlayerControlActions = {
+    // Memoized Actions — stable reference unless handlers change
+    const stableShowGestureHUD = player.showGestureHUD || (() => {});
+    const actions: PlayerControlActions = useMemo(() => ({
         togglePlay,
         toggleFullscreen,
         handleSeekRelative,
-        showGestureHUD: player.showGestureHUD || (() => {}),
+        showGestureHUD: stableShowGestureHUD,
         setIsHovering: player.setIsHovering,
         setShowSettings,
         handleMouseMove,
         handleTouchStart,
         handleTouchMove,
         handleTouchEnd,
-    };
+    }), [togglePlay, toggleFullscreen, handleSeekRelative, stableShowGestureHUD, player.setIsHovering, setShowSettings, handleMouseMove, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
     // PC端交互规则
     const handlePCMouseEnter = usePCMouseEnter(state, refs, actions);
@@ -100,6 +101,14 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
     usePCCloseSettingsOnOutsideClick(state, refs, actions);
     usePCCloseSettingsOnEscape(state, actions);
 
+    // Memoized handler for settings panel mouse move
+    const handlePCSettingsPanelMouseMove = useCallback(() => {
+        handlePCControlsHover();
+        player.onSettingsPanelMouseMove?.();
+    }, [handlePCControlsHover, player.onSettingsPanelMouseMove]);
+
+    const handleCloseSettings = useCallback(() => setShowSettings(false), [setShowSettings]);
+
     // 移动端面板触摸活动追踪（重置自动关闭计时器）
     useEffect(() => {
         const el = mobileSettingsPanelRef.current;
@@ -107,7 +116,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         const handleTouchMove = () => { player.onSettingsPanelMouseMove?.(); };
         el.addEventListener('touchmove', handleTouchMove, true);
         return () => { el.removeEventListener('touchmove', handleTouchMove, true); };
-    });
+    }, [player.onSettingsPanelMouseMove]);
 
     // PC面板点击活动追踪（重置自动关闭计时器）
     // 使用 capture 阶段原生事件，确保在 React stopPropagation 之前捕获点击
@@ -117,7 +126,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         const handleClick = () => { player.onSettingsPanelClick?.(); };
         el.addEventListener('click', handleClick, true);
         return () => { el.removeEventListener('click', handleClick, true); };
-    });
+    }, [player.onSettingsPanelClick]);
 
     // 移动端交互规则
     const { handleTouchStart: handleMobileTouchStart, handleTouchEnd: handleMobileTouchEnd } = useMobileVideoTouch(refs, actions, state);
@@ -256,14 +265,11 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 <div
                     ref={pcSettingsPanelRef}
                     className="hidden md:block absolute bottom-16 right-4 z-[100]"
-                    onMouseMove={() => {
-                        handlePCControlsHover();
-                        player.onSettingsPanelMouseMove?.();
-                    }}
+                    onMouseMove={handlePCSettingsPanelMouseMove}
                 >
                     <PlayerSettingsPanel
                         player={player}
-                        onClose={() => setShowSettings(false)}
+                        onClose={handleCloseSettings}
                     />
                 </div>
             )}
