@@ -8,13 +8,14 @@ interface UseVideoEventsProps {
     playbackRate: number;
     volume: number;
     isMuted: boolean;
+    setIsMuted: React.Dispatch<React.SetStateAction<boolean>>;
     isLoading: boolean;
     hasPrefetchedNextRef: React.RefObject<boolean>;
 }
 
 export function useVideoEvents({
     videoRef, onEnded, autoplay, nextEpisodeUrl,
-    playbackRate, volume, isMuted, isLoading, hasPrefetchedNextRef,
+    playbackRate, volume, isMuted, setIsMuted, isLoading, hasPrefetchedNextRef,
 }: UseVideoEventsProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -30,15 +31,23 @@ export function useVideoEvents({
     }, [nextEpisodeUrl]);
 
     // Autoplay with muted fallback
+    const autoplayRef = useRef(autoplay);
+    autoplayRef.current = autoplay;
+
     useEffect(() => {
-        if (autoplay && videoRef.current && !isLoading) {
-            const playPromise = videoRef.current.play();
+        const video = videoRef.current;
+        if (!autoplay || !video || isLoading) return;
+
+        const attemptPlay = () => {
+            if (!video || video.paused === false) return;
+            const playPromise = video.play();
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
                     if (error.name === 'AbortError') return;
-                    if (videoRef.current) {
-                        videoRef.current.muted = true;
-                        const mutedPromise = videoRef.current.play();
+                    if (video) {
+                        video.muted = true;
+                        setIsMuted(true);
+                        const mutedPromise = video.play();
                         if (mutedPromise !== undefined) {
                             mutedPromise.catch(e => {
                                 if (e instanceof Error && e.name !== 'AbortError') { /* ignore */ }
@@ -47,7 +56,23 @@ export function useVideoEvents({
                     }
                 });
             }
-        }
+        };
+
+        // 首次尝试播放
+        attemptPlay();
+
+        // 安全网：canplay 时如果视频仍然暂停，重试播放
+        // 处理 HLS 生命周期竞态（MEDIA_ATTACHED 晚于 MANIFEST_PARSED）
+        const onCanPlay = () => {
+            if (autoplayRef.current && video.paused) {
+                attemptPlay();
+            }
+        };
+        video.addEventListener('canplay', onCanPlay, { once: true });
+
+        return () => {
+            video.removeEventListener('canplay', onCanPlay);
+        };
     }, [autoplay, isLoading]);
 
     // Video event listeners

@@ -3,7 +3,6 @@ import { CONFIG } from '@/config/config';
 
 interface UseVideoControlsProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
-    videoRef: React.RefObject<HTMLVideoElement | null>;
     isPlaying: boolean;
     isDragging: boolean;
     showSettings: boolean;
@@ -15,15 +14,16 @@ interface UseVideoControlsProps {
 }
 
 export function useVideoControls({
-    containerRef, videoRef, isPlaying, isDragging, showSettings,
+    containerRef, isPlaying, isDragging, showSettings,
     togglePlay, handleSeekRelative, showGestureHUD, setShowSettings, lastSeekEndTimeRef,
 }: UseVideoControlsProps) {
     const [isHovering, setIsHovering] = useState(false);
     const [isWebFullscreen, setIsWebFullscreen] = useState(false);
 
     const lastTapRef = useRef(0);
+    const [settingsActivityCount, setSettingsActivityCount] = useState(0);
 
-    // Central video click handler
+    // 中央视频点击处理
     const handleVideoClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         const now = Date.now();
         const isTouch = 'touches' in e || 'changedTouches' in e;
@@ -52,6 +52,7 @@ export function useVideoControls({
                     togglePlay();
                 }
             } else {
+                // 单击切换控制栏显示/隐藏
                 setIsHovering(prev => !prev);
             }
         } else {
@@ -63,14 +64,14 @@ export function useVideoControls({
         }
 
         lastTapRef.current = now;
-    }, [containerRef, isDragging, togglePlay, handleSeekRelative, showGestureHUD]);
+    }, [containerRef, togglePlay, handleSeekRelative, showGestureHUD, lastSeekEndTimeRef]);
 
     const toggleFullscreen = useCallback(() => {
         const container = containerRef.current;
         if (!container) return;
         if (!document.fullscreenElement) container.requestFullscreen();
         else document.exitFullscreen();
-    }, []);
+    }, [containerRef]);
 
     const toggleWebFullscreen = useCallback(() => {
         const container = containerRef.current;
@@ -82,24 +83,26 @@ export function useVideoControls({
             container.style.cssText = '';
             setIsWebFullscreen(false);
         }
-    }, [isWebFullscreen]);
+    }, [containerRef, isWebFullscreen]);
 
-    // Auto-hide controls
-    useEffect(() => {
-        let timeout: NodeJS.Timeout;
-
-        if (CONFIG.AUTO_HIDE_CONTROLS && isPlaying && isHovering && !isDragging && !showSettings) {
-            timeout = setTimeout(() => setIsHovering(false), CONFIG.CONTROLS_AUTO_HIDE_TIME);
+    // 设置面板鼠标活动追踪（节流，最多每秒触发一次状态更新）
+    const lastActivityUpdateRef = useRef(0);
+    const onSettingsPanelMouseMove = useCallback(() => {
+        const now = Date.now();
+        if (now - lastActivityUpdateRef.current > 1000) {
+            lastActivityUpdateRef.current = now;
+            setSettingsActivityCount(c => c + 1);
         }
-        return () => clearTimeout(timeout);
-    }, [isPlaying, isHovering, isDragging, showSettings]);
+    }, []);
 
-    // Auto-close settings when controls hide
-    useEffect(() => {
-        if (!isHovering) setShowSettings(false);
-    }, [isHovering, setShowSettings]);
+    // 设置面板点击活动追踪（重置自动关闭计时器）
+    const onSettingsPanelClick = useCallback(() => {
+        setSettingsActivityCount(c => c + 1);
+    }, []);
 
-    // Auto-close settings panel after inactivity
+    // 设置面板不活动超时后自动关闭
+    // 依赖 settingsActivityCount 在用户移动鼠标时重置计时器
+    // 注意：不能依赖 isHovering，因为 true→true 不触发重渲染
     useEffect(() => {
         if (!showSettings) return;
         const timeout = setTimeout(() => {
@@ -107,7 +110,7 @@ export function useVideoControls({
             setIsHovering(false);
         }, CONFIG.SETTINGS_AUTO_CLOSE_TIME);
         return () => clearTimeout(timeout);
-    }, [showSettings, isHovering, setShowSettings]);
+    }, [showSettings, settingsActivityCount, setShowSettings, setIsHovering]);
 
     return {
         isHovering,
@@ -116,5 +119,7 @@ export function useVideoControls({
         handleVideoClick,
         toggleFullscreen,
         toggleWebFullscreen,
+        onSettingsPanelMouseMove,
+        onSettingsPanelClick,
     };
 }

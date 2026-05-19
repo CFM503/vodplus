@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { formatTime } from '@/lib/player-utils';
 
@@ -32,26 +32,50 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
     const [dragPercent, setDragPercent] = useState(0);
     const isDraggingRef = useRef(false);
     const dragPercentRef = useRef(0);
+    const trackRectRef = useRef<DOMRect | null>(null); // 缓存track的rect
 
     const [isHovering, setIsHovering] = useState(false);
     const [hoverProgress, setHoverProgress] = useState(0);
 
     /**
      * Calculate percentage from clientX using the track element's bounding rect.
-     * This ensures the percentage matches exactly with the visual position of the knob.
+     * 优化：缓存rect，减少getBoundingClientRect调用
      */
     const getPercentFromClientX = useCallback((clientX: number): number => {
         const el = trackRef.current;
         if (!el) return 0;
-        const rect = el.getBoundingClientRect();
+        
+        // 缓存rect，避免重复计算
+        let rect = trackRectRef.current;
+        if (!rect || rect.width === 0) {
+            rect = el.getBoundingClientRect();
+            trackRectRef.current = rect;
+        }
+        
         if (rect.width === 0) return 0;
         const x = clientX - rect.left;
         return Math.max(0, Math.min(100, (x / rect.width) * 100));
     }, []);
+    
+    // 窗口大小变化时更新缓存
+    useEffect(() => {
+        const updateRect = () => {
+            if (trackRef.current) {
+                trackRectRef.current = trackRef.current.getBoundingClientRect();
+            }
+        };
+        updateRect();
+        window.addEventListener('resize', updateRect);
+        window.addEventListener('fullscreenchange', updateRect);
+        return () => {
+            window.removeEventListener('resize', updateRect);
+            window.removeEventListener('fullscreenchange', updateRect);
+        };
+    }, []);
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         setHoverProgress(getPercentFromClientX(e.clientX));
-    };
+    }, [getPercentFromClientX]);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
         // Capture pointer so move/up events continue even if finger leaves element
@@ -70,27 +94,47 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
         if (e.cancelable) e.preventDefault();
     }, [getPercentFromClientX, handleSeekStart]);
 
+    // 优化：使用requestAnimationFrame减少拖动时的渲染频率
+    const rafRef = useRef<number | null>(null);
+    
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
         if (!isDraggingRef.current) return;
 
-        const percent = getPercentFromClientX(e.clientX);
-        setDragPercent(percent);
-        dragPercentRef.current = percent;
-        setHoverProgress(percent);
-
-        handleSeekMove(percent);
+        // 取消之前的raf，只保留最新的
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+        }
+        
+        rafRef.current = requestAnimationFrame(() => {
+            const percent = getPercentFromClientX(e.clientX);
+            
+            // 只在变化超过阈值时更新
+            if (Math.abs(percent - dragPercentRef.current) < 0.5) return;
+            
+            setDragPercent(percent);
+            dragPercentRef.current = percent;
+            setHoverProgress(percent);
+            handleSeekMove(percent);
+        });
 
         e.stopPropagation();
     }, [getPercentFromClientX, handleSeekMove]);
 
     const handlePointerUp = useCallback((e: React.PointerEvent) => {
+        // 清理raf
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+        
         if (!isDraggingRef.current) return;
 
         const finalPercent = dragPercentRef.current;
         isDraggingRef.current = false;
         setIsDragging(false);
-        setIsHovering(false);
-        setHoverProgress(0);
+        // 优化：不重置hoverProgress，避免额外渲染
+        // setIsHovering(false);
+        // setHoverProgress(0);
 
         // Pass the final percentage so the hook seeks the video
         handleSeekEnd(finalPercent);
@@ -98,6 +142,13 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
         try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
         e.stopPropagation();
     }, [handleSeekEnd]);
+
+    // 优化：使用useCallback包装事件处理函数
+    const handleMouseEnter = useCallback(() => setIsHovering(true), []);
+    const handleMouseLeave = useCallback(() => {
+        setIsHovering(false);
+        setHoverProgress(0);
+    }, []);
 
     // During drag, show the local drag percentage; otherwise show real playback progress
     const displayProgress = isDragging ? dragPercent : progress;
@@ -114,8 +165,8 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
                 className
             )}
             style={{ touchAction: 'none' }}
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => { setIsHovering(false); setHoverProgress(0); }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
             onMouseMove={handleMouseMove}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}

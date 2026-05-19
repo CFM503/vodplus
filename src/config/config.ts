@@ -166,7 +166,7 @@ export const CONFIG = {
 
     // 设置面板自动关闭时间 (毫秒)
     // 用户停止交互后多久自动关闭设置面板
-    SETTINGS_AUTO_CLOSE_TIME: 3000,
+    SETTINGS_AUTO_CLOSE_TIME: 10000,
 
     // 手势 HUD 自动隐藏时间 (毫秒)
     // 双击快进/快退提示显示多久后自动消失

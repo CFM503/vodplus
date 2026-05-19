@@ -21,10 +21,16 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
     const [currentLevel, setCurrentLevel] = useState(-1);
     const [activeLevelIdx, setActiveLevelIdx] = useState(-1);
 
+    // 追踪 MEDIA_ATTACHED 状态，确保 play() 在视频源挂载后才执行
+    const manifestParsedRef = useRef(false);
+    const mediaAttachedRef = useRef(false);
+
     // Reset flags on URL change
     useEffect(() => {
         hasPrefetchedNextRef.current = false;
         hasSkippedIntroRef.current = false;
+        manifestParsedRef.current = false;
+        mediaAttachedRef.current = false;
     }, [url]);
 
     // HLS initialization
@@ -34,6 +40,8 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
         setCurrentLevel(-1);
         setActiveLevelIdx(-1);
         hasSkippedIntroRef.current = false;
+        manifestParsedRef.current = false;
+        mediaAttachedRef.current = false;
 
         // Load skip intro time from session storage
         if (typeof window !== 'undefined') {
@@ -85,13 +93,27 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength }: UseHls
                     hlsRef.current = hls;
 
                     hls.loadSource(url.trim());
+
+                    // 辅助：两个事件都就绪后才设置 isLoading=false
+                    const tryFinishLoading = () => {
+                        if (manifestParsedRef.current && mediaAttachedRef.current) {
+                            setIsLoading(false);
+                        }
+                    };
+
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         const availableLevels = hls.levels.map((l: { height: number }, idx: number) => ({
                             height: l.height,
                             index: idx
                         })).sort((a, b) => b.height - a.height);
                         setLevels(availableLevels);
-                        setIsLoading(false);
+                        manifestParsedRef.current = true;
+                        tryFinishLoading();
+                    });
+
+                    hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                        mediaAttachedRef.current = true;
+                        tryFinishLoading();
                     });
 
                     hls.on(Hls.Events.LEVEL_SWITCHED, (_: unknown, data: { level: number }) => {

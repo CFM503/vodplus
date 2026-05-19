@@ -110,19 +110,25 @@ export function useVideoGestures({
             gestureTypeRef.current = isLeft ? 'vertical-left' : 'vertical-right';
         }
 
-        // Execute gesture
+        // Execute gesture - 优化：添加阈值检查，减少不必要的更新
         if (gestureTypeRef.current === 'vertical-left') {
             const brightnessDelta = -(deltaY / containerRect.height) * 100;
             const newBrightness = Math.max(0, Math.min(200, touchStartRef.current.brightness + brightnessDelta));
-            setBrightness(newBrightness);
-            showGestureHUD('brightness', `${Math.round(newBrightness)}%`);
+            // 只在变化超过1%时更新
+            if (Math.abs(newBrightness - brightness) > 1) {
+                setBrightness(newBrightness);
+                showGestureHUD('brightness', `${Math.round(newBrightness)}%`);
+            }
         } else if (gestureTypeRef.current === 'vertical-right') {
             const volumeDelta = -(deltaY / containerRect.height);
             const newVolume = Math.max(0, Math.min(1, touchStartRef.current.vol + volumeDelta));
-            handleVolumeChange(newVolume);
-            showGestureHUD('volume', `${Math.round(newVolume * 100)}%`);
+            // 只在变化超过1%时更新
+            if (Math.abs(newVolume - volume) > 0.01) {
+                handleVolumeChange(newVolume);
+                showGestureHUD('volume', `${Math.round(newVolume * 100)}%`);
+            }
         }
-    }, [isEmbed, isSpeedHolding, containerRef, handleVolumeChange, showGestureHUD]);
+    }, [isEmbed, isSpeedHolding, containerRef, handleVolumeChange, showGestureHUD, brightness, volume]);
 
     const handleTouchEnd = useCallback((e: React.TouchEvent): boolean => {
         if (longPressTimerRef.current) {

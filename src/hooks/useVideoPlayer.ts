@@ -88,7 +88,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
 
     const handleSeekRelative = useCallback((seconds: number) => {
         const video = videoRef.current;
-        if (!video) return;
+        if (!video || !video.duration) return;
         video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
     }, []);
 
@@ -149,6 +149,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         playbackRate,
         volume,
         isMuted,
+        setIsMuted,
         isLoading: hlsSource.isLoading,
         hasPrefetchedNextRef: hlsSource.hasPrefetchedNextRef,
     });
@@ -195,7 +196,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     // 6. Controls
     const controls = useVideoControls({
         containerRef,
-        videoRef,
         isPlaying: events.isPlaying,
         isDragging: seek.isDragging,
         showSettings: settings.showSettings,
@@ -259,23 +259,27 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         }
     }, [hlsSource.isLoading, showToast]);
 
-    // Wiring: touch end → video click on tap
+    // Wiring: touch end → gesture cleanup (tap handling delegated to useMobileVideoTouch in VideoPlayer.tsx)
     const handleTouchEndWired = useCallback((e: React.TouchEvent) => {
         const wasTap = gestures.handleTouchEnd(e);
         if (wasTap) {
             if (e.cancelable) e.preventDefault();
-            controls.handleVideoClick(e);
+            // Mobile tap handling (controls toggle / double-tap) is delegated to
+            // useMobileVideoTouch in VideoPlayer.tsx for YouTube-style behavior.
+            // Do NOT call controls.handleVideoClick here.
         }
         if (!wasTap) {
             controls.setIsHovering(true);
         }
-    }, [gestures.handleTouchEnd, controls.handleVideoClick, controls.setIsHovering]);
+    }, [gestures.handleTouchEnd, controls.setIsHovering]);
 
-    // Wiring: mouse move → show controls
+    // Wiring: mouse move → show controls (skip when settings open to prevent flicker)
     const handleMouseMoveWired = useCallback((e: React.MouseEvent) => {
         gestures.handleMouseMove(e);
-        controls.setIsHovering(true);
-    }, [gestures.handleMouseMove, controls.setIsHovering]);
+        if (!settings.showSettings) {
+            controls.setIsHovering(true);
+        }
+    }, [gestures.handleMouseMove, controls.setIsHovering, settings.showSettings]);
 
     // Wiring: buffer change → orchestrator maxBufferLength
     const handleBufferChangeWired = useCallback((buf: number) => {
@@ -325,6 +329,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         togglePlay,
         toggleMute,
         handleVolumeChange,
+        handleSeekRelative,
         handleSeekStart: seek.handleSeekStart,
         handleSeekMove: seek.handleSeekMove,
         handleSeekEnd: seek.handleSeekEnd,
@@ -340,10 +345,13 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         handleBufferChange: handleBufferChangeWired,
 
         handleMouseMove: handleMouseMoveWired,
+        onSettingsPanelMouseMove: controls.onSettingsPanelMouseMove,
+        onSettingsPanelClick: controls.onSettingsPanelClick,
         handleVideoClick: controls.handleVideoClick,
         handleTouchStart: gestures.handleTouchStart,
         handleTouchMove: gestures.handleTouchMove,
         handleTouchEnd: handleTouchEndWired,
         formatTime,
+        showGestureHUD: gestures.showGestureHUD,
     };
 }

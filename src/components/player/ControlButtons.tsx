@@ -2,19 +2,18 @@ import React from 'react';
 import { Settings, Maximize, Minimize } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
-import PlayerSettingsPanel from './PlayerSettingsPanel';
 
 type PlayerState = ReturnType<typeof useVideoPlayer>;
 
 interface ControlButtonsProps {
     player: PlayerState;
     variant?: 'desktop' | 'mobile';
+    onSettingsToggle?: (e: React.TouchEvent | React.MouseEvent) => void;
 }
 
-const ControlButtons = React.memo(function ControlButtons({ player, variant = 'desktop' }: ControlButtonsProps) {
+const ControlButtons = React.memo(function ControlButtons({ player, variant = 'desktop', onSettingsToggle }: ControlButtonsProps) {
     const {
         showSettings,
-        setShowSettings,
         toggleFullscreen,
         toggleWebFullscreen,
         isWebFullscreen
@@ -25,45 +24,33 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         ? "p-2 rounded-full hover:bg-white/10 active:scale-95 transition-all"
         : "p-1 hover:scale-110 transition-transform hover:text-indigo-400";
 
+    const handleSettingsClick = (e: React.MouseEvent | React.TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onSettingsToggle) {
+            onSettingsToggle(e);
+        }
+    };
+
     return (
-        <div
-            className={cn("flex items-center", variant === 'desktop' ? "gap-4" : "gap-1")}
-            onClick={(e) => e.stopPropagation()}
-        >
+        <div className={cn("flex items-center", variant === 'desktop' ? "gap-4" : "gap-1")}>
             {/* Settings */}
             <div className="relative">
                 <button
+                    data-settings-toggle
                     onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setShowSettings(!showSettings);
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setShowSettings(!showSettings);
-                    }}
+                    onTouchEnd={handleSettingsClick}
+                    onClick={handleSettingsClick}
                     className={cn(
                         btnClass,
                         variant === 'desktop' && "hover:rotate-45 duration-300",
                         showSettings && (variant === 'desktop' ? "rotate-45 text-indigo-400" : "bg-white/10")
                     )}
                     title="设置"
+                    aria-expanded={showSettings}
                 >
                     <Settings className={iconClass} />
                 </button>
-
-                {showSettings && variant === 'desktop' && (
-                    <div
-                        className="absolute bottom-full right-0 mb-4 z-50 min-w-[280px] animate-in fade-in slide-in-from-bottom-2"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <PlayerSettingsPanel
-                            player={player}
-                            onClose={() => setShowSettings(false)}
-                        />
-                    </div>
-                )}
             </div>
 
             {/* Web Fullscreen (Desktop Only) */}

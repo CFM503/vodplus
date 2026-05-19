@@ -8,7 +8,6 @@ import { CONFIG } from '@/config/config';
 import VideoProgressBar from './VideoProgressBar';
 import EpisodeControls from './EpisodeControls';
 import ControlButtons from './ControlButtons';
-import PlayerSettingsPanel from './PlayerSettingsPanel';
 
 type PlayerState = ReturnType<typeof useVideoPlayer>;
 
@@ -20,7 +19,14 @@ interface VideoControlsProps {
     onNextEpisode?: () => void;
     hasPrevEpisode?: boolean;
     hasNextEpisode?: boolean;
+    onSettingsToggle?: (e: React.TouchEvent | React.MouseEvent) => void;
+    onPCSettingsToggle?: (e: React.MouseEvent | React.TouchEvent) => void;
 }
+
+const stopEvent = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+};
 
 const VideoControls = React.memo(function VideoControls({
     player,
@@ -29,7 +35,9 @@ const VideoControls = React.memo(function VideoControls({
     onPrevEpisode,
     onNextEpisode,
     hasPrevEpisode,
-    hasNextEpisode
+    hasNextEpisode,
+    onSettingsToggle,
+    onPCSettingsToggle,
 }: VideoControlsProps) {
     const {
         isPlaying,
@@ -40,56 +48,27 @@ const VideoControls = React.memo(function VideoControls({
         handleVolumeChange,
         duration,
         formatTime,
-        videoRef,
         progress,
         showSettings,
-        setShowSettings,
     } = player;
 
     return (
-        <>
+        <div className="flex flex-col h-full">
             {/* Top Overlay Gradient */}
-            <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300">
+            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent">
                 {CONFIG.SHOW_EPISODE_TITLE_OVERLAY && title && (
-                    <h2 className="text-white text-base md:text-lg font-medium drop-shadow-md select-text pointer-events-auto truncate max-w-[calc(100%-3rem)] md:max-w-[60%] pr-2">
+                    <h2 className="text-white text-base md:text-lg font-medium drop-shadow-md select-text truncate max-w-[calc(100%-3rem)] md:max-w-[60%] pr-2">
                         {title}
                     </h2>
                 )}
             </div>
 
-
-            {/* Center Play Button */}
-            {CONFIG.SHOW_CENTER_PLAY_BUTTON === 1 && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                    <button
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            togglePlay();
-                        }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            togglePlay();
-                        }}
-                        className={cn(
-                            "pointer-events-auto w-16 h-16 md:w-20 md:h-20 rounded-full bg-indigo-600/90 hover:bg-indigo-500 text-white shadow-xl",
-                            "flex items-center justify-center active:scale-90 transition-all"
-                        )}
-                        aria-label={isPlaying ? 'Pause' : 'Play'}
-                    >
-                        {isPlaying ? (
-                            <Pause className="w-8 h-8 md:w-10 md:h-10 fill-white" />
-                        ) : (
-                            <Play className="w-8 h-8 md:w-10 md:h-10 fill-white translate-x-0.5" />
-                        )}
-                    </button>
-                </div>
-            )}
+            {/* Spacer */}
+            <div className="flex-1" />
 
             {/* Bottom Controls */}
             <div className={cn(
-                "absolute bottom-0 left-0 right-0 transition-opacity duration-300 z-20",
+                "relative",
                 showSettings ? "" : "bg-gradient-to-t from-black/70 to-transparent"
             )}>
                 {/* Mobile layout */}
@@ -101,15 +80,8 @@ const VideoControls = React.memo(function VideoControls({
                         <div className="flex items-center gap-1 shrink-0 min-w-0">
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    togglePlay();
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    togglePlay();
-                                }}
+                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); togglePlay(); }}
+                                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
                                 className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                             >
                                 {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
@@ -125,15 +97,8 @@ const VideoControls = React.memo(function VideoControls({
 
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    toggleMute();
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleMute();
-                                }}
+                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); toggleMute(); }}
+                                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
                                 className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                                 title={isMuted ? "取消静音" : "静音"}
                             >
@@ -146,32 +111,9 @@ const VideoControls = React.memo(function VideoControls({
                         </div>
 
                         <div className="flex items-center shrink-0">
-                            <ControlButtons player={player} variant="mobile" />
+                            <ControlButtons player={player} variant="mobile" onSettingsToggle={onSettingsToggle} />
                         </div>
                     </div>
-
-                    {/* Mobile Settings Modal */}
-                    {showSettings && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                            <div
-                                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in"
-                                onClick={() => setShowSettings(false)}
-                            />
-                            <div
-                                className="relative z-10 w-full max-w-xs animate-in zoom-in-95 duration-200"
-                                onTouchStart={(e) => e.stopPropagation()}
-                                onTouchMove={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => e.stopPropagation()}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <PlayerSettingsPanel
-                                    player={player}
-                                    onClose={() => setShowSettings(false)}
-                                    className="max-h-[80vh] overflow-y-auto w-full"
-                                />
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Desktop layout */}
@@ -192,13 +134,7 @@ const VideoControls = React.memo(function VideoControls({
 
                         {/* Volume Slider */}
                         <div className="flex items-center gap-2 group/volume relative">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleMute();
-                                }}
-                                className="hover:scale-110 transition-transform"
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); toggleMute(); }} className="hover:scale-110 transition-transform">
                                 {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                             </button>
                             <div className="w-0 overflow-hidden group-hover/volume:w-24 transition-all duration-300 flex items-center">
@@ -208,10 +144,8 @@ const VideoControls = React.memo(function VideoControls({
                                     max="1"
                                     step="0.05"
                                     value={volume}
-                                    onChange={(e) => {
-                                        handleVolumeChange(parseFloat(e.target.value));
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                                    onClick={stopEvent}
                                     className="w-20 h-1 bg-white/30 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white hover:[&::-webkit-slider-thumb]:scale-110 accent-white"
                                 />
                             </div>
@@ -223,11 +157,11 @@ const VideoControls = React.memo(function VideoControls({
 
                         <div className="flex-1" />
 
-                        <ControlButtons player={player} variant="desktop" />
+                        <ControlButtons player={player} variant="desktop" onSettingsToggle={onPCSettingsToggle} />
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 });
 

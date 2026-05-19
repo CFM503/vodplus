@@ -1,6 +1,6 @@
 {
   "name": "vodplus",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.18.0",
+    "@playwright/mcp": "^0.0.75",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
