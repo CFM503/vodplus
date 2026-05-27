@@ -1,3 +1,16 @@
+# VODplus v0.9.2 - Persistent Player Memory & Cross-Session Progress Restore
+
+## Features & Optimizations
+- **Cross-Session Progress Restore**: Upgraded video progress auto-saving and recovery from `sessionStorage` to `localStorage`. You can now close the browser tab or completely shut down Chrome and return tomorrow to continue watching exactly from your last watched frame.
+- **Full Player Setting Memory**: Upgraded player settings to be persistent in `localStorage`. This includes:
+  - **Video Scale** (`VOD_VIDEO_SCALE`)
+  - **Skip Intro Time** (`VOD_SKIP_INTRO`)
+  - **Playback Speed** (`VOD_PLAYBACK_RATE`)
+  - **Buffer Strategy** (`VOD_MAX_BUFFER_LENGTH`)
+- **Backward Compatibility**: Supports smooth automatic migration from old `VOD_SESSION_SKIP_INTRO` sessionStorage values.
+
+---
+
 # VODplus v0.9.1 - Player Smoothness & Playback Progress Recovery
 
 ## Features & Optimizations

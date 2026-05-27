@@ -116,10 +116,10 @@ export function useVideoEvents({
                 setProgressState(currentProgressPercent);
                 updateBuffered();
 
-                // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，避免记录片头片尾的无效位置）
+                // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，避免记录片头片尾的无效位置）到 localStorage
                 if (video.currentTime > 5 && video.currentTime < video.duration - 5) {
                     const key = getProgressKey(url);
-                    sessionStorage.setItem(key, video.currentTime.toString());
+                    localStorage.setItem(key, video.currentTime.toString());
                 }
 
                 // Next Episode preload at 60% progress
@@ -157,9 +157,9 @@ export function useVideoEvents({
         };
         const handleEnded = () => {
             setIsPlaying(false);
-            // 播放结束，自动清除进度缓存
+            // 播放结束，自动清除进度缓存 (localStorage)
             const key = getProgressKey(url);
-            sessionStorage.removeItem(key);
+            localStorage.removeItem(key);
             if (onEnded) onEnded();
         };
 

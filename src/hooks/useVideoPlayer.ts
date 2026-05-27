@@ -42,18 +42,31 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     // ===========================
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
-    const [playbackRate, setPlaybackRate] = useState(1);
-    const [maxBufferLength, setMaxBufferLength] = useState(CONFIG.DEFAULT_BUFFER_LENGTH);
+    const [playbackRate, setPlaybackRate] = useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("VOD_PLAYBACK_RATE");
+            if (saved) return parseFloat(saved);
+        }
+        return 1;
+    });
+    const [maxBufferLength, setMaxBufferLength] = useState(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("VOD_MAX_BUFFER_LENGTH");
+            if (saved) return parseInt(saved, 10);
+        }
+        return CONFIG.DEFAULT_BUFFER_LENGTH;
+    });
     const [videoScale, setVideoScale] = useState(() => {
         if (typeof window !== "undefined") {
-            const saved = sessionStorage.getItem("VOD_VIDEO_SCALE");
+            const saved = localStorage.getItem("VOD_VIDEO_SCALE");
             if (saved) return parseFloat(saved);
         }
         return 1;
     });
     const [skipIntroTime, setSkipIntroTime] = useState(() => {
         if (typeof window !== "undefined") {
-            const saved = sessionStorage.getItem("VOD_SESSION_SKIP_INTRO");
+            // 支持从旧版本的 VOD_SESSION_SKIP_INTRO 升级迁移
+            const saved = localStorage.getItem("VOD_SKIP_INTRO") || sessionStorage.getItem("VOD_SESSION_SKIP_INTRO");
             if (saved) return parseInt(saved, 10);
         }
         return 0;
@@ -235,18 +248,30 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         volume,
     });
 
-    // Persist player settings to sessionStorage
+    // Persist player settings to localStorage
     useEffect(() => {
         if (typeof window !== "undefined") {
-            sessionStorage.setItem("VOD_VIDEO_SCALE", videoScale.toString());
+            localStorage.setItem("VOD_VIDEO_SCALE", videoScale.toString());
         }
     }, [videoScale]);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
-            sessionStorage.setItem("VOD_SESSION_SKIP_INTRO", skipIntroTime.toString());
+            localStorage.setItem("VOD_SKIP_INTRO", skipIntroTime.toString());
         }
     }, [skipIntroTime]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("VOD_PLAYBACK_RATE", playbackRate.toString());
+        }
+    }, [playbackRate]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("VOD_MAX_BUFFER_LENGTH", maxBufferLength.toString());
+        }
+    }, [maxBufferLength]);
 
     // Progress recovery and Skip intro effect
     const hasRestoredProgressRef = useRef(false);
@@ -272,7 +297,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             hasRestoredProgressRef.current = true;
 
             const key = getProgressKey(url);
-            const savedTimeStr = sessionStorage.getItem(key);
+            const savedTimeStr = localStorage.getItem(key);
             const savedTime = savedTimeStr ? parseFloat(savedTimeStr) : 0;
 
             if (savedTime > 5 && savedTime < video.duration - 5) {
