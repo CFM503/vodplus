@@ -168,9 +168,6 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
 
             if (document.visibilityState === 'visible') {
                 hlsRef.current.startLoad();
-                if (videoRef.current && !videoRef.current.paused) {
-                    hlsRef.current.recoverMediaError();
-                }
             } else if (document.visibilityState === 'hidden') {
                 // 如果视频处于暂停状态，切到后台时主动暂停分片下载，避免无效的后台网络消耗和请求超时积压
                 if (videoRef.current?.paused) {

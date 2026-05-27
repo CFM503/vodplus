@@ -1,26 +1,24 @@
-## 🚀 性能优化 (v0.6.0)
+# VODPlus 视频聚合播放平台 (Premium Edition)
 
-**最新优化已发布！** 查看 [优化报告](OPTIMIZATION_REPORT.md) 了解详情。
-
-### 性能提升
-- ⚡ 首页加载加速 **20x** (2000ms → 100ms)
-- 📦 JS包体积减少 **27%** (450KB → 330KB)
-- 🎯 LCP 改善 **52%** (2.5s → 1.2s)
-- 🚀 TTI 缩短 **40%** (3.0s → 1.8s)
-
-### 优化内容
-- API缓存 + Edge Runtime
-- 图片懒加载
-- 播放器动态导入
-- 请求去重
-- DNS预连接
-- 智能预取系统
+一个基于 **Next.js 15** 和 **React 19** 构建的现代化、高性能视频聚合平台。它不仅是一个简单的资源站前端，更是一个集成了多源匹配、智能发现和高性能播放内核的媒体中心。
 
 ---
 
-# VODPlus 视频聚合播放平台 (Premium Edition)
+## 🚀 核心更新：播放器全能长久记忆 (v0.9.2)
 
-一个基于 **Next.js 15** 和 **React 19** 构建的现代化、高性能视频聚合平台。它不仅是一个简单的资源站前端，更是一个集成了多源匹配、智能发现和高性能内核的媒体中心。
+**最新升级已发布！** 播放内核现在具备全局跨会话长期记忆，为您带来无缝的观影体验。
+
+### ⚡ 升级亮点
+- **🔄 跨会话播放记忆 (断点续播)**：播放进度存储介质升级为 `localStorage`。用户关闭网页、关闭浏览器甚至关机重启，下次打开该集数时，仍能自动恢复到上次播放的精准位置，并弹出 `已为您恢复播放进度：XX:XX` 提示。
+- **💾 四大播放设置长久记忆**：
+  - **画面缩放比例** (`VOD_VIDEO_SCALE`)：缩放设置跨网页窗口与会话长久保存。
+  - **跳过片头秒数** (`VOD_SKIP_INTRO`)：片头跳过设置长效记忆，支持从旧版本自动无缝升级迁移。
+  - **播放速度 (倍速)** (`VOD_PLAYBACK_RATE`)：长久记住您的专属播放速度（如 1.5x、2.0x）。
+  - **缓冲策略 (最大缓存)** (`VOD_MAX_BUFFER_LENGTH`)：记住您的缓冲习惯，从 30s 极速到 120s 抗断网长期生效。
+- **🔋 后台能效与唤醒优化 (HLS Throttling)**：在标签页处于后台（`hidden`）且视频处于**暂停状态**时，主动挂起分片下载；切回前台（`visible`）时极速恢复网络拉取，彻底消除 Chrome 后台限制导致的网络超时、积压及页面唤醒卡顿。
+- **⚡ 极致起播响应**：首页秒开加速 **20x**，播放器采用动态分割导入，加载包体积精简 **27%**。
+
+---
 
 ## ✨ 核心特性
 
@@ -43,11 +41,14 @@
 - 🎥 **专业播放器内核**：
   - **逻辑/UI 分离**：独立的 `useVideoPlayer` 核心钩子。
   - **响应式设计**：统一的 `VideoControls` 组件，自适应桌面端和移动端布局。
+  - **全局长久记忆**：跨会话播放记忆，无缝断点续播，四大播放设置长期存储。
   - 支持多码率自动切换、优先级识别、快捷键、画中画、投屏功能。
 - 🏗️ **企业级代码质量**：
   - **统一错误处理**：中间件模式集中管理错误，日志格式统一，易于监控集成。
   - **强类型定义**：完整的 TypeScript 类型系统，`any` 使用率低于 5%，重构更安全。
   - **代码简洁性**：错误处理样板代码减少 **80%**，核心业务逻辑更清晰。
+
+---
 
 ## 📂 目录与架构
 
@@ -95,14 +96,18 @@ src/
     └── service.ts        # 服务层类型定义 ⭐ NEW
 ```
 
+---
+
 ## 🛠 技术栈
 
 - **框架**: [Next.js 15](https://nextjs.org/) (Edge Runtime)
 - **UI 组件**: [React 19](https://reactjs.org/), [TailwindCSS](https://tailwindcss.com/)
 - **图标**: [Lucide React](https://lucide.dev/)
-- **视频引擎**: [HLS.js](https://github.com/video-dev/hls.js)
+- **视频视频引擎**: [HLS.js](https://github.com/video-dev/hls.js)
 - **元数据库**: [TMDB API](https://www.themoviedb.org/)
 - **部署**: [Cloudflare Pages](https://pages.cloudflare.com/)
+
+---
 
 ## 🚀 快速部署
 
@@ -132,6 +137,8 @@ TMDB_API_BASE=https://api.themoviedb.org/3
    - 进入项目 **Settings** → **Functions**。
    - 在 **Compatibility flags** 中添加 `nodejs_compat`。
    - 否则将遇到 503 Service Unavailable 错误。
+
+---
 
 ## 🏗️ 双源架构 (Dual-Source Architecture)
 
@@ -168,6 +175,8 @@ TMDB_API_BASE=https://api.themoviedb.org/3
 - 只有基础框架会立即发送给浏览器。
 - 各个内容区块（HomeSection）独立获取数据，准备好后自动“嵌入”页面。
 
+---
+
 ## 🔧 自定义扩展
 
 ### 添加/删除资源源
@@ -176,6 +185,8 @@ TMDB_API_BASE=https://api.themoviedb.org/3
 ### 切换元数据源 (如换成 IMDB)
 1. 在 `src/lib/metadata/` 下创建新的 Provider 实现接口。
 2. 在 `src/lib/metadata/index.ts` 中修改默认 Provider。
+
+---
 
 ## 📄 许可证
 

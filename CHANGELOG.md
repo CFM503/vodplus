@@ -1,3 +1,11 @@
+# VODplus v0.9.3 - Tab Switching Buffer Restoration Patch
+
+## Features & Optimizations
+- **Tab Buffering Loss Prevention**: Removed redundant and destructive `recoverMediaError()` call from the `visibilitychange` handler. This prevents HLS.js from unnecessarily flushing/emptying the pre-cached video buffer and re-binding the HTMLVideoElement when restoring a minimized tab or switching back while playing. Playback now resumes instantly from the existing buffer without re-caching or flashing the poster/thumbnail.
+- **Robust Error Recovery Integration**: Re-aligned visible tab wake-ups to rely on HLS.js native error event listener recovery for actual media errors, and `usePlaybackHealth` stall checks for background network connection lags, resulting in stable and seamless multitasking support.
+
+---
+
 # VODplus v0.9.2 - Persistent Player Memory & Cross-Session Progress Restore
 
 ## Features & Optimizations
