@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
@@ -164,10 +164,17 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
 
         // Visibility handling — tied to HLS lifecycle to avoid listener accumulation
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && hlsRef.current) {
+            if (!hlsRef.current) return;
+
+            if (document.visibilityState === 'visible') {
                 hlsRef.current.startLoad();
                 if (videoRef.current && !videoRef.current.paused) {
                     hlsRef.current.recoverMediaError();
+                }
+            } else if (document.visibilityState === 'hidden') {
+                // 如果视频处于暂停状态，切到后台时主动暂停分片下载，避免无效的后台网络消耗和请求超时积压
+                if (videoRef.current?.paused) {
+                    hlsRef.current.stopLoad();
                 }
             }
         };

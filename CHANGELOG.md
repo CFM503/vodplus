@@ -1,3 +1,12 @@
+# VODplus v0.9.1 - Player Smoothness & Playback Progress Recovery
+
+## Features & Optimizations
+- **Progress Auto-Save & Recovery**: Automatically saves current playback time to `sessionStorage` using a sanitized URL key (excluding CDN dynamics) during `timeupdate`. Seeks back to the saved progress seamlessly on tab reloading/remounting with a Toast notification.
+- **HLS Background Throttling Prevention**: Automatically pauses/stops HLS segment loading (`hls.stopLoad()`) when the tab goes to the background and the video is paused, preventing network timeouts and page wake-up lag.
+- **Unified Loading Orchestration**: Integrated progress restoration seamlessly into the player's initial loading phase, providing automatic fallback to `skipIntroTime` only if there's no saved progress.
+
+---
+
 # VODplus v0.7.0 - Playback Page Restoration & Bug Fixes
 
 ## Bug Fixes

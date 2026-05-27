@@ -1,6 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 
+// 清洗并获取进度的唯一缓存 Key，去除动态签名等 Query 参数
+const getProgressKey = (videoUrl: string) => {
+    try {
+        const parsed = new URL(videoUrl);
+        return `VOD_PROGRESS_${parsed.origin}${parsed.pathname}`;
+    } catch (e) {
+        return `VOD_PROGRESS_${videoUrl}`;
+    }
+};
+
 interface UseVideoEventsProps {
+    url: string;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     onEnded?: () => void;
     autoplay: boolean;
@@ -14,7 +25,7 @@ interface UseVideoEventsProps {
 }
 
 export function useVideoEvents({
-    videoRef, onEnded, autoplay, nextEpisodeUrl,
+    url, videoRef, onEnded, autoplay, nextEpisodeUrl,
     playbackRate, volume, isMuted, setIsMuted, isLoading, hasPrefetchedNextRef,
 }: UseVideoEventsProps) {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -105,6 +116,12 @@ export function useVideoEvents({
                 setProgressState(currentProgressPercent);
                 updateBuffered();
 
+                // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，避免记录片头片尾的无效位置）
+                if (video.currentTime > 5 && video.currentTime < video.duration - 5) {
+                    const key = getProgressKey(url);
+                    sessionStorage.setItem(key, video.currentTime.toString());
+                }
+
                 // Next Episode preload at 60% progress
                 const nextUrl = nextEpisodeUrlRef.current;
                 if (nextUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 60) {
@@ -140,6 +157,9 @@ export function useVideoEvents({
         };
         const handleEnded = () => {
             setIsPlaying(false);
+            // 播放结束，自动清除进度缓存
+            const key = getProgressKey(url);
+            sessionStorage.removeItem(key);
             if (onEnded) onEnded();
         };
 
@@ -167,7 +187,7 @@ export function useVideoEvents({
             video.removeEventListener('seeked', handleSeeked);
             video.removeEventListener('ended', handleEnded);
         };
-    }, [onEnded]);
+    }, [url, onEnded]);
 
     // Optimistic progress setter (for seek operations to provide instant feedback)
     const setProgress = useCallback((pct: number) => {

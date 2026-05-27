@@ -154,6 +154,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
 
     // 3. Video Events
     const events = useVideoEvents({
+        url,
         videoRef,
         onEnded,
         autoplay,
@@ -247,35 +248,62 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         }
     }, [skipIntroTime]);
 
-    // Skip intro effect
+    // Progress recovery and Skip intro effect
+    const hasRestoredProgressRef = useRef(false);
+    useEffect(() => {
+        hasRestoredProgressRef.current = false;
+    }, [url]);
+
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || hlsSource.isLoading || hlsSource.hasSkippedIntroRef.current) return;
+        if (!video || hlsSource.isLoading || hasRestoredProgressRef.current) return;
 
-        const target = skipIntroTimeRef.current;
-        if (target <= 0) {
-            hlsSource.hasSkippedIntroRef.current = true;
-            return;
-        }
+        const getProgressKey = (videoUrl: string) => {
+            try {
+                const parsed = new URL(videoUrl);
+                return `VOD_PROGRESS_${parsed.origin}${parsed.pathname}`;
+            } catch (e) {
+                return `VOD_PROGRESS_${videoUrl}`;
+            }
+        };
 
-        const doSkip = () => {
-            if (hlsSource.hasSkippedIntroRef.current) return;
-            hlsSource.hasSkippedIntroRef.current = true;
-            video.currentTime = target;
-            showToast(`已为您跳过片头 ${target}s`);
+        const doRestore = () => {
+            if (hasRestoredProgressRef.current) return;
+            hasRestoredProgressRef.current = true;
+
+            const key = getProgressKey(url);
+            const savedTimeStr = sessionStorage.getItem(key);
+            const savedTime = savedTimeStr ? parseFloat(savedTimeStr) : 0;
+
+            if (savedTime > 5 && savedTime < video.duration - 5) {
+                video.currentTime = savedTime;
+                showToast(`已为您恢复播放进度：${formatTime(savedTime)}`);
+                // 标记已跳过片头，防止再次触发跳过片头导致进度被覆盖
+                hlsSource.hasSkippedIntroRef.current = true;
+            } else {
+                // 如果没有保存进度，且片头秒数大于0且尚未跳过，则执行跳过片头逻辑
+                const target = skipIntroTimeRef.current;
+                if (target > 0 && !hlsSource.hasSkippedIntroRef.current) {
+                    hlsSource.hasSkippedIntroRef.current = true;
+                    video.currentTime = target;
+                    showToast(`已为您跳过片头 ${target}s`);
+                } else {
+                    hlsSource.hasSkippedIntroRef.current = true;
+                }
+            }
         };
 
         if (video.readyState >= 1) {
-            doSkip();
+            doRestore();
         } else {
             const onLoadedMetadata = () => {
-                doSkip();
+                doRestore();
                 video.removeEventListener('loadedmetadata', onLoadedMetadata);
             };
             video.addEventListener('loadedmetadata', onLoadedMetadata);
             return () => video.removeEventListener('loadedmetadata', onLoadedMetadata);
         }
-    }, [hlsSource.isLoading, showToast]);
+    }, [url, hlsSource.isLoading, showToast]);
 
     // Wiring: touch end → gesture cleanup (tap handling delegated to useMobileVideoTouch in VideoPlayer.tsx)
     const handleTouchEndWired = useCallback((e: React.TouchEvent) => {
