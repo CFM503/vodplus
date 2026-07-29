@@ -1,6 +1,7 @@
 import { Movie, ApiResponse } from '@/types';
 import { RESOURCE_SITES, ResourceSite } from '../resources';
 import { getProxyImage, getThemedPlaceholder } from '../utils';
+import { CONFIG } from '@/config/config';
 
 export function normalizeVodResponse(data: any, source: ResourceSite, duration: number): ApiResponse {
     if (!data) {
@@ -11,7 +12,9 @@ export function normalizeVodResponse(data: any, source: ResourceSite, duration: 
         const rawPic = m.vod_pic || m.pic;
         const typeName = m.type_name || m.type;
         const vodName = m.vod_name || m.name;
-        const picUrl = rawPic ? getProxyImage(rawPic) : getThemedPlaceholder(typeName, vodName);
+        const picUrl = rawPic
+            ? getProxyImage(rawPic, { width: CONFIG.IMAGE_THUMB_WIDTH, quality: CONFIG.IMAGE_THUMB_QUALITY })
+            : getThemedPlaceholder(typeName, vodName);
 
         // Clean up play_from (e.g., "feifan$$$ffm3u8" -> "非凡资源")
         const rawPlayFrom = m.vod_play_from || '';

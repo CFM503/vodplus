@@ -30,15 +30,29 @@ export async function fetchWithTimeout(
     }
 }
 
-export function getProxyImage(url: string | undefined): string {
+/**
+ * Proxy remote posters via wsrv.nl with resize + webp.
+ * Card grids only need ~400px wide images; full-size origins are often 1–5MB and feel very slow.
+ */
+export function getProxyImage(
+    url: string | undefined,
+    opts?: { width?: number; quality?: number }
+): string {
     if (!url || typeof url !== 'string' || url.trim() === '') {
-        return 'https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=500';
+        return 'https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=400&h=600&fit=crop';
     }
 
     let cleanUrl = url.trim();
+    const width = opts?.width ?? 400;
+    const quality = opts?.quality ?? 70;
 
-    // Avoid double proxying
+    // Avoid double proxying; if already wsrv without size, leave as-is
     if (cleanUrl.includes('wsrv.nl') || cleanUrl.includes('weserv.nl')) {
+        return cleanUrl;
+    }
+
+    // TMDB CDN is already sized and fast — skip extra proxy hop
+    if (cleanUrl.includes('image.tmdb.org')) {
         return cleanUrl;
     }
 
@@ -49,9 +63,8 @@ export function getProxyImage(url: string | undefined): string {
         cleanUrl = 'https://' + cleanUrl;
     }
 
-    // Use wsrv.nl proxy (it's very reliable for Chinese VOD sites)
-    // We remove the default param to avoid potential encoding issues with the fallback URL itself
-    return `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}&output=webp`;
+    // w = thumbnail width, we = no upscale, n=-1 = long cache, output=webp
+    return `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}&w=${width}&output=webp&q=${quality}&we&n=-1`;
 }
 
 export function getThemedPlaceholder(typeName?: string, vodName?: string): string {

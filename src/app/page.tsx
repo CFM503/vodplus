@@ -50,7 +50,8 @@ const getCachedNewestTv = unstable_cache(
 async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
   const list = await getCachedTrendingMovies(source, disabledSources, customLocalUrl);
   if (!list || list.length === 0) return null;
-  return <HomeSection title={source === "tmdb" ? "今日趋势 (电影)" : "热门电影 (本地)"} list={list} iconColor="indigo" />;
+  // Only the first above-the-fold section gets priority image loading
+  return <HomeSection title={source === "tmdb" ? "今日趋势 (电影)" : "热门电影 (本地)"} list={list} iconColor="indigo" priorityCount={6} />;
 }
 
 async function ActionSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {

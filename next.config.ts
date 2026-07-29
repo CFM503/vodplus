@@ -43,11 +43,13 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'wsrv.nl' },
+      { protocol: 'https', hostname: 'weserv.nl' },
       { protocol: 'https', hostname: 'image.tmdb.org' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
     formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 86400,
+    // Long cache for proxied posters; thumbnails change rarely
+    minimumCacheTTL: 604800,
   },
   productionBrowserSourceMaps: false,
   poweredByHeader: false,

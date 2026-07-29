@@ -8,7 +8,8 @@ import { SERVER_CONFIG } from '@/config/server';
 
 export const TMDB_API_KEY = SERVER_CONFIG.TMDB.API_KEY;
 export const TMDB_BASE_URL = SERVER_CONFIG.TMDB.BASE_URL;
-const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+// w342 is enough for card grids; w500 was oversize and slowed first paint
+const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 
 interface TmdbItem {
     id: number;

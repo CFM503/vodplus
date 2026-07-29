@@ -13,9 +13,11 @@ interface HomeSectionProps {
     list: Movie[];
     link?: string;
     iconColor?: string;
+    /** Only first section should eager-load; multiple sections with priority starve bandwidth */
+    priorityCount?: number;
 }
 
-export function HomeSection({ title, list, link = '#', iconColor = 'indigo' }: HomeSectionProps) {
+export function HomeSection({ title, list, link = '#', iconColor = 'indigo', priorityCount = 0 }: HomeSectionProps) {
     if (!list || list.length === 0) return null;
 
     return (
@@ -29,7 +31,11 @@ export function HomeSection({ title, list, link = '#', iconColor = 'indigo' }: H
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
                 {list.map((movie: Movie, index: number) => (
-                    <MovieCard key={movie.vod_id} movie={movie} index={index} />
+                    <MovieCard
+                        key={movie.vod_id}
+                        movie={movie}
+                        index={index < priorityCount ? index : 999}
+                    />
                 ))}
             </div>
         </section>

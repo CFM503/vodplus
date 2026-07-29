@@ -57,8 +57,8 @@ export function MovieList({ sourceId, pageNum, mediaType, initialData = null }: 
     return (
         <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6 mb-16">
-                {list.map((movie: Movie) => (
-                    <MovieCard key={movie.vod_id} movie={movie} />
+                {list.map((movie: Movie, index: number) => (
+                    <MovieCard key={movie.vod_id} movie={movie} index={index} />
                 ))}
             </div>
 

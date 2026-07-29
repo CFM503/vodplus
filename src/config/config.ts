@@ -181,4 +181,10 @@ export const CONFIG = {
     // 在封面图真正加载完成前显示一个深色模糊占位，避免闪烁。
     // 可替换为符合品牌风格的自定义 base64 图片。
     IMAGE_BLUR_PLACEHOLDER: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWUyOTNiIi8+PC9zdmc+',
+
+    // 封面缩略图代理宽度 (px) — 卡片展示足够，避免拉取源站原图
+    IMAGE_THUMB_WIDTH: 400,
+
+    // 封面缩略图 WebP 质量 (1-100)
+    IMAGE_THUMB_QUALITY: 70,
 };

@@ -1,3 +1,15 @@
+# VODplus v0.9.4 - Thumbnail Loading Speed
+
+## Features & Optimizations
+- **Proxy Resize**: `getProxyImage` now requests thumbnail-sized WebP from wsrv.nl (`w=400`, `q=70`, long cache) instead of full-resolution originals (often 1–5MB).
+- **Skip Double Optimization**: MovieCard uses `unoptimized` so images load directly from wsrv/TMDB, avoiding the Next.js `/_next/image` extra hop on Cloudflare/edge.
+- **Priority Storm Fix**: Only the first above-the-fold home section eager-loads 6 posters; other sections stay lazy so they no longer fight for bandwidth.
+- **TMDB Card Size**: List posters use `w342` instead of `w500`.
+- **Connection Warmup**: Added `preconnect` / `dns-prefetch` for `wsrv.nl`.
+- **Config**: `IMAGE_THUMB_WIDTH` / `IMAGE_THUMB_QUALITY` in `config.ts` for easy tuning.
+
+---
+
 # VODplus v0.9.3 - Tab Switching Buffer Restoration Patch
 
 ## Features & Optimizations
