@@ -75,6 +75,11 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                 if (Hls.isSupported()) {
                     if (hlsRef.current) hlsRef.current.destroy();
 
+                    // Calculate and bound maxBufferSize dynamically based on maxBufferLength:
+                    // - Base minimum: 30MB, Proportional scaling: 2MB/s, Ceiling: 100MB
+                    const initialCalculatedSize = maxBufferLength * 2 * 1024 * 1024;
+                    const initialBoundedSize = Math.min(100 * 1024 * 1024, Math.max(30 * 1024 * 1024, initialCalculatedSize));
+
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
@@ -82,8 +87,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         enableWorker: true,
                         maxBufferLength: CONFIG.BUFFER_ADAPTIVE ? Math.min(maxBufferLength, CONFIG.BUFFER_HIGH_BW) : maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
-                        // 限制最大缓冲区大小为 30MB，防止高速带宽下无限制缓存消耗内存
-                        maxBufferSize: 30 * 1024 * 1024,
+                        maxBufferSize: initialBoundedSize,
                         backBufferLength: 90,
                         lowLatencyMode: false,
                         manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
