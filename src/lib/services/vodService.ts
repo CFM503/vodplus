@@ -103,8 +103,8 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                 const searchPromises = activeSources.map(async (source) => {
                     try {
                         const searchUrl = source.searchPath.replace('ac=list', 'ac=detail');
-                        // Use a fast 3000ms timeout for candidate searches to avoid blocking SSR
-                        const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, 3000);
+                        // Use a configurable timeout for candidate searches to avoid blocking SSR
+                        const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, CONFIG.MATCH_SOURCE_TIMEOUT || 3000);
 
                         if (res && res.list && res.list.length > 0) {
                             // Find precise match within this source's results
@@ -166,6 +166,14 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                         vod_name: name,
                         vod_content: data.overview || match.vod_content,
                         vod_pic: data.poster || match.vod_pic,
+                        // Return and cache all candidates fetched so far for client-side line switching
+                        candidates: candidates.map(c => ({
+                            source_id: c.source.id,
+                            source_name: c.source.name,
+                            vod_id: c.match.vod_id,
+                            vod_play_url: c.match.vod_play_url,
+                            vod_play_from: c.match.vod_play_from || c.source.name,
+                        })),
                     };
                 }
             }

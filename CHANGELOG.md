@@ -1,3 +1,11 @@
+# VODplus v0.9.11 - Configurable Match Timeouts & Candidates Cache
+
+## Features & Optimizations
+- **Configurable Match Timeout**: Exposed `MATCH_SOURCE_TIMEOUT: 3000` configuration option in `config.ts` and parameterized `getMovieDetail` to use it instead of a hardcoded value.
+- **Candidates Cache Expansion**: Enriched the `Movie` interface and updated TMDB search matching to preserve and return the list of all found candidates in the Movie detail JSON payload. This caches all matched sources on the edge/server layer, allowing subsequent manual line-switching without re-triggering search API fetches.
+
+---
+
 # VODplus v0.9.10 - Adaptive Buffer Priority Fix
 
 ## Bug Fixes
