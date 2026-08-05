@@ -67,11 +67,10 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
                     src={imgSrc}
                     alt={movie.vod_name}
                     fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 17vw"
                     // wsrv.nl already resizes/encodes; skip Next image optimizer double-hop (critical on CF/edge)
                     unoptimized
                     priority={index < 6}
-                    loading={index < 6 ? 'eager' : 'lazy'}
                     decoding="async"
                     placeholder="blur"
                     blurDataURL={CONFIG.IMAGE_BLUR_PLACEHOLDER}

@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, MonitorPlay, Settings } from 'lucide-react';
-import SettingsModal from './SettingsModal';
+import dynamic from 'next/dynamic';
+const SettingsModal = dynamic(() => import('./SettingsModal'), { ssr: false });
 
 export function Header() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);

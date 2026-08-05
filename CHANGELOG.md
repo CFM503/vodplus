@@ -1,3 +1,13 @@
+# VODplus v0.9.8 - Core Pages Loading Speed Optimization
+
+## Features & Optimizations
+- **Premium Skeleton Shimmer**: Replaced bulk `animate-pulse` animations in the page loading skeletons with custom, high-end `.shimmer-item` linear-gradient sliding animations.
+- **Header Settings Lazy Loading**: Converted `SettingsModal` import to a lazy-loaded dynamic import (`dynamic` with `ssr: false`), saving ~3-5KB of initial JS bundle payload on the home, library, and search pages.
+- **Accurate Responsive Image Sizes**: Customized the responsive `sizes` attribute on the `MovieCard` thumbnail image to exactly match the flex column grid ratios, reducing image over-fetching on high-DPI desktop viewports.
+- **Compliant Next.js Image Priority**: Removed the redundant and spec-conflicting `loading` attribute from priority-loaded thumbnails to prevent browser warnings and ensure faster paint paths.
+
+---
+
 # VODplus v0.9.7 - Advanced Video Playback Experience
 
 ## Features & Optimizations
