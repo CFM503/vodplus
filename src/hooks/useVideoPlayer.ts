@@ -51,21 +51,22 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
     });
     const [maxBufferLength, setMaxBufferLength] = useState(() => {
         if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("VOD_MAX_BUFFER_LENGTH");
-            if (saved) return parseInt(saved, 10);
-
-            // Network-adaptive buffering strategy fallback (for weak network and data saver)
+            // 1. 优先检测当前网络状况是否为弱网或省流，以实施积极的主动降级（防止旧的历史大缓冲区撑爆弱网信道）
             if ('connection' in navigator) {
                 const conn = (navigator as any).connection;
                 if (conn) {
                     if (conn.effectiveType === '2g' || conn.effectiveType === '3g') {
-                        return 8; // Weak network -> shorter buffer (8s) prevents fragment queue backlog
+                        return 8; // 弱网强制使用 8s 短缓冲，防止切片下载队列积压
                     }
                     if (conn.saveData) {
-                        return 10; // Save data mode -> 10s buffer
+                        return 10; // 省流模式强制使用 10s 短缓冲
                     }
                 }
             }
+
+            // 2. 只有在网速良好时，才应用 localStorage 保存的历史大缓冲设置
+            const saved = localStorage.getItem("VOD_MAX_BUFFER_LENGTH");
+            if (saved) return parseInt(saved, 10);
         }
         return CONFIG.DEFAULT_BUFFER_LENGTH || 15;
     });

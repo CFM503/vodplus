@@ -1,3 +1,10 @@
+# VODplus v0.9.10 - Adaptive Buffer Priority Fix
+
+## Bug Fixes
+- **Weak-Network Adaptive Buffering Priority**: Reordered the buffer initialization logic in `useVideoPlayer.ts` to prioritize active connection quality check (`2g`/`3g`/`saveData`) over `localStorage` historical settings. This ensures that users who saved large buffers in broadband sessions will automatically degrade to safe `8s`/`10s` buffers when connection quality drops, preventing chunk queue clog and startup delays.
+
+---
+
 # VODplus v0.9.9 - Match & Play Speed Optimization
 
 ## Features & Optimizations
