@@ -82,100 +82,57 @@ export async function getRecentMovies(sourceId: string = 'feifan', page: number 
     return fetchFromSource(source, `?ac=detail&pg=${page}&t=`, false, CONFIG.LIST_TIMEOUT || 4000);
 }
 
-export async function getMovieDetail(sourceId: string, id: string, disabledSources: string[] = []) {
+export async function getMovieDetail(sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string) {
     if (sourceId === 'tmdb') {
         const provider = getMetadataProvider(sourceId);
         const detailId = id.replace(`${sourceId}-`, '');
         try {
-            const data = await provider.getDetail(detailId);
-            if (!data) return null;
+            const tmdbPromise = provider.getDetail(detailId);
+            
+            let bestEntry = null;
+            let candidates: any[] = [];
+            let data = null;
 
-            const name = data.title;
-            if (name) {
-                // Scheme B: Race for Candidates (Optimized for Accuracy & Speed)
-                const activeSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));
-                const candidates: any[] = [];
-                const targetCount = CONFIG.MATCH_CANDIDATE_COUNT || 3;
-
-
-
-                // Create a promise for each source search
-                const searchPromises = activeSources.map(async (source) => {
-                    try {
-                        const searchUrl = source.searchPath.replace('ac=list', 'ac=detail');
-                        // Use a configurable timeout for candidate searches to avoid blocking SSR
-                        const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, CONFIG.MATCH_SOURCE_TIMEOUT || 3000);
-
-                        if (res && res.list && res.list.length > 0) {
-                            // Find precise match within this source's results
-                            const match = res.list.find((m: any) =>
-                                m.vod_play_url && (m.vod_name === name || m.vod_name.includes(name))
-                            );
-
-                            if (match) {
-                                return { source, match, timestamp: Date.now() };
-                            }
-                        }
-                    } catch (e) {
-                        // Ignore individual source errors
+            if (nameHint) {
+                // Parallel Mode: Fetch TMDB details and VOD matching in parallel
+                const matchPromise = performRaceMatch(nameHint, disabledSources);
+                const [tmdbResult, matchResult] = await Promise.all([tmdbPromise, matchPromise]);
+                data = tmdbResult;
+                bestEntry = matchResult.bestEntry;
+                candidates = matchResult.candidates;
+            } else {
+                // Serial Mode Fallback
+                data = await tmdbPromise;
+                if (data) {
+                    const name = data.title;
+                    if (name) {
+                        const matchResult = await performRaceMatch(name, disabledSources);
+                        bestEntry = matchResult.bestEntry;
+                        candidates = matchResult.candidates;
                     }
-                    return null;
-                });
-
-                // Custom "Race to N" implementation
-                // We wrap promises to resolve into a collector as they finish
-                await new Promise<void>((resolve) => {
-                    let completed = 0;
-                    let found = 0;
-                    let resolved = false;
-
-                    if (searchPromises.length === 0) resolve();
-
-                    searchPromises.forEach(p => {
-                        p.then(result => {
-                            if (resolved) return;
-                            completed++;
-                            if (result) {
-                                candidates.push(result);
-                                found++;
-                                // Fast Exact Match: If we get a 100% exact name match from a fast site,
-                                // resolve immediately to provide instant start without waiting for others.
-                                if (result.match.vod_name.trim() === name.trim()) {
-                                    resolved = true;
-                                    resolve();
-                                    return;
-                                }
-                            }
-
-                            // Stop waiting if we have enough candidates OR all sources finished
-                            if (found >= targetCount || completed === searchPromises.length) {
-                                resolved = true;
-                                resolve();
-                            }
-                        });
-                    });
-                });
-
-                const bestEntry = selectBestMatch(candidates, name);
-
-                if (bestEntry) {
-                    const { match } = bestEntry;
-                    // Update metadata from the discovery provider
-                    return {
-                        ...match,
-                        vod_name: name,
-                        vod_content: data.overview || match.vod_content,
-                        vod_pic: data.poster || match.vod_pic,
-                        // Return and cache all candidates fetched so far for client-side line switching
-                        candidates: candidates.map(c => ({
-                            source_id: c.source.id,
-                            source_name: c.source.name,
-                            vod_id: c.match.vod_id,
-                            vod_play_url: c.match.vod_play_url,
-                            vod_play_from: c.match.vod_play_from || c.source.name,
-                        })),
-                    };
                 }
+            }
+
+            if (!data) return null;
+            const finalName = nameHint || data.title;
+
+            if (bestEntry) {
+                const { match } = bestEntry;
+                // Update metadata from the discovery provider
+                return {
+                    ...match,
+                    vod_name: finalName,
+                    vod_content: data.overview || match.vod_content,
+                    vod_pic: data.poster || match.vod_pic,
+                    // Return and cache all candidates fetched so far for client-side line switching
+                    candidates: candidates.map(c => ({
+                        source_id: c.source.id,
+                        source_name: c.source.name,
+                        vod_id: c.match.vod_id,
+                        vod_play_url: c.match.vod_play_url,
+                        vod_play_from: c.match.vod_play_from || c.source.name,
+                    })),
+                };
             }
         } catch (e) {
             logger.error('vodService', 'Match & Play Error:', e);
@@ -190,19 +147,85 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
 }
 
 const internalCachedGetMovieDetail = unstable_cache(
-    async (sourceId: string, id: string, disabledSourcesKey: string) => {
+    async (sourceId: string, id: string, disabledSourcesKey: string, nameHint?: string) => {
         const disabledSources = disabledSourcesKey ? disabledSourcesKey.split(',') : [];
-        return getMovieDetail(sourceId, id, disabledSources);
+        return getMovieDetail(sourceId, id, disabledSources, nameHint);
     },
     ['movie-detail-v2'],
     { revalidate: CONFIG.DETAIL_REVALIDATE_SECONDS || 43200 }
 );
 
 // React.cache ensures per-request deduplication (e.g. generateMetadata + MovieDetail page component)
-export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, disabledSources: string[] = []) => {
+export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string) => {
     const disabledSourcesKey = (disabledSources || []).slice().sort().join(',');
-    return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey);
+    return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey, nameHint);
 });
+
+async function performRaceMatch(name: string, disabledSources: string[]) {
+    const activeSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));
+    const candidates: any[] = [];
+    const targetCount = CONFIG.MATCH_CANDIDATE_COUNT || 3;
+
+    // Create a promise for each source search
+    const searchPromises = activeSources.map(async (source) => {
+        try {
+            const searchUrl = source.searchPath.replace('ac=list', 'ac=detail');
+            // Use a configurable timeout for candidate searches to avoid blocking SSR
+            const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, CONFIG.MATCH_SOURCE_TIMEOUT || 3000);
+
+            if (res && res.list && res.list.length > 0) {
+                // Find precise match within this source's results
+                const match = res.list.find((m: any) =>
+                    m.vod_play_url && (m.vod_name === name || m.vod_name.includes(name))
+                );
+
+                if (match) {
+                    return { source, match, timestamp: Date.now() };
+                }
+            }
+        } catch (e) {
+            // Ignore individual source errors
+        }
+        return null;
+    });
+
+    // Custom "Race to N" implementation
+    // We wrap promises to resolve into a collector as they finish
+    await new Promise<void>((resolve) => {
+        let completed = 0;
+        let found = 0;
+        let resolved = false;
+
+        if (searchPromises.length === 0) resolve();
+
+        searchPromises.forEach(p => {
+            p.then(result => {
+                if (resolved) return;
+                completed++;
+                if (result) {
+                    candidates.push(result);
+                    found++;
+                    // Fast Exact Match: If we get a 100% exact name match from a fast site,
+                    // resolve immediately to provide instant start without waiting for others.
+                    if (result.match.vod_name.trim() === name.trim()) {
+                        resolved = true;
+                        resolve();
+                        return;
+                    }
+                }
+
+                // Stop waiting if we have enough candidates OR all sources finished
+                if (found >= targetCount || completed === searchPromises.length) {
+                    resolved = true;
+                    resolve();
+                }
+            });
+        });
+    });
+
+    const bestEntry = selectBestMatch(candidates, name);
+    return { bestEntry, candidates };
+}
 
 function selectBestMatch(candidates: any[], targetName: string) {
     if (!candidates || candidates.length === 0) return null;

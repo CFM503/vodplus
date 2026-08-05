@@ -22,8 +22,9 @@ interface PageProps {
     searchParams: Promise<{ name?: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params, searchParams }: PageProps) {
     const { sourceId, id } = await params;
+    const { name } = await searchParams || {};
     // We don't need disabledSources for metadata as we just want the info, 
     // and getMovieDetail handles the lookup nicely.
     // However, getMovieDetail signature requires it. 
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: PageProps) {
     const cookieStore = await cookies();
     const preferences = await getUserPreferences(cookieStore);
 
-    const movie = await cachedGetMovieDetail(sourceId, id, preferences.disabledSources);
+    const movie = await cachedGetMovieDetail(sourceId, id, preferences.disabledSources, name);
 
     if (!movie) {
         return {
@@ -69,7 +70,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
     const cookieStore = await cookies();
     const { disabledSources } = await getUserPreferences(cookieStore);
 
-    const movie = await cachedGetMovieDetail(sourceId, id, disabledSources);
+    const movie = await cachedGetMovieDetail(sourceId, id, disabledSources, name);
 
     if (!movie) {
         if (name) {

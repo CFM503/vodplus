@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const source = searchParams.get('source');
     const id = searchParams.get('id');
+    const name = searchParams.get('name') || undefined;
 
     if (!source || !id) {
         return NextResponse.json({ code: 400, msg: 'Missing source or id', data: null }, { status: 400 });
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
         const cookieStore = await cookies();
         const { disabledSources } = await getUserPreferences(cookieStore);
 
-        const movie = await cachedGetMovieDetail(source, id, disabledSources);
+        const movie = await cachedGetMovieDetail(source, id, disabledSources, name);
         return NextResponse.json({ code: 1, msg: 'OK', data: movie });
     } catch (error) {
         logger.error('DetailAPI', 'Error fetching detail:', error);

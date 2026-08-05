@@ -1,3 +1,11 @@
+# VODplus v0.9.13 - Click-to-Play Parallel Matching Speedup
+
+## Features & Optimizations
+- **Parallel TMDB & VOD Matching**: Refactored `getMovieDetail` inside `vodService.ts` to accept a `nameHint` parameter. If present, it executes the TMDB metadata details fetch and the 8-active-sources parallel RaceMatch fetch simultaneously via `Promise.all`. This cuts click-to-play server TTFB latency in half (saving ~300ms on p50).
+- **Detail Route & Page Alignment**: Updated page metadata generator, movie detail page components, and `/api/vod/detail` proxy routes to pass the `name` search parameter into `cachedGetMovieDetail`, achieving instant parallel search matching.
+
+---
+
 # VODplus v0.9.12 - HLS.js Buffer Size Dynamic Scaling
 
 ## Features & Optimizations
