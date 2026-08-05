@@ -103,7 +103,8 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                 const searchPromises = activeSources.map(async (source) => {
                     try {
                         const searchUrl = source.searchPath.replace('ac=list', 'ac=detail');
-                        const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`);
+                        // Use a fast 3000ms timeout for candidate searches to avoid blocking SSR
+                        const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, 3000);
 
                         if (res && res.list && res.list.length > 0) {
                             // Find precise match within this source's results
@@ -137,6 +138,13 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                             if (result) {
                                 candidates.push(result);
                                 found++;
+                                // Fast Exact Match: If we get a 100% exact name match from a fast site,
+                                // resolve immediately to provide instant start without waiting for others.
+                                if (result.match.vod_name.trim() === name.trim()) {
+                                    resolved = true;
+                                    resolve();
+                                    return;
+                                }
                             }
 
                             // Stop waiting if we have enough candidates OR all sources finished
@@ -179,7 +187,7 @@ const internalCachedGetMovieDetail = unstable_cache(
         return getMovieDetail(sourceId, id, disabledSources);
     },
     ['movie-detail-v2'],
-    { revalidate: CONFIG.API_REVALIDATE_SECONDS }
+    { revalidate: CONFIG.DETAIL_REVALIDATE_SECONDS || 43200 }
 );
 
 // React.cache ensures per-request deduplication (e.g. generateMetadata + MovieDetail page component)

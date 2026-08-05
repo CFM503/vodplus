@@ -108,6 +108,8 @@ export const CONFIG = {
     // 控制首页/详情页数据在边缘节点缓存多久，减少重复请求。
     // 0: 不缓存；300: 缓存5分钟 (默认)
     API_REVALIDATE_SECONDS: 300,
+    // 详情页数据及源站匹配长效缓存时间 (秒) - 默认 12 小时 (43200秒)
+    DETAIL_REVALIDATE_SECONDS: 43200,
 
     // 分类缓存时间（秒），不同内容类型使用不同缓存时长
     TRENDING_REVALIDATE: 60, // 热门内容1分钟缓存

@@ -1,3 +1,12 @@
+# VODplus v0.9.9 - Match & Play Speed Optimization
+
+## Features & Optimizations
+- **Fast Exact Match Resolution**: Added an early-exit break in the TMDB parallel search loop that immediately stops waiting for slower sources and returns the match if a source yields a 100% exact name match.
+- **Search Timeout Enforcement**: Capped individual candidate searches in `getMovieDetail` to a strict 3000ms timeout using `timeoutOverride`, preventing sluggish VOD APIs from stalling SSR.
+- **Extended Detail Cache TTL**: Added a new parameter `DETAIL_REVALIDATE_SECONDS` configured to `43200` (12 hours) to cache TMDB-to-VOD mapping results, cutting subsequent detail loads down to 0ms.
+
+---
+
 # VODplus v0.9.8 - Core Pages Loading Speed Optimization
 
 ## Features & Optimizations
