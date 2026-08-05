@@ -1,3 +1,11 @@
+# VODplus v0.9.12 - HLS.js Buffer Size Dynamic Scaling
+
+## Features & Optimizations
+- **Dynamic maxBufferSize Scaling**: Enhanced dynamic buffer config synchronization in `useHlsSource.ts` to automatically adjust HLS.js `maxBufferSize` in proportion to `maxBufferLength` (2MB per second of buffer time).
+- **Buffer Safety Bounds**: Imposed a baseline threshold of `30MB` to guarantee smooth start for high-bitrate streams, and capped it at `100MB` to prevent runaway memory leak crashes on low-end mobile devices during prolonged buffer settings.
+
+---
+
 # VODplus v0.9.11 - Configurable Match Timeouts & Candidates Cache
 
 ## Features & Optimizations

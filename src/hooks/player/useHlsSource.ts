@@ -206,6 +206,14 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         const hls = hlsRef.current;
         (hls.config as any).maxBufferLength = maxBufferLength;
         (hls.config as any).maxMaxBufferLength = maxBufferLength * 2;
+        
+        // Link maxBufferSize dynamically with maxBufferLength:
+        // - Base minimum: 30MB (to ensure high-bitrate playback is smooth)
+        // - Proportional scaling: 2MB per second of buffer length
+        // - Safe upper ceiling: 100MB (to prevent out-of-memory crashes on mobile/low-end devices)
+        const calculatedSize = maxBufferLength * 2 * 1024 * 1024;
+        const boundedSize = Math.min(100 * 1024 * 1024, Math.max(30 * 1024 * 1024, calculatedSize));
+        (hls.config as any).maxBufferSize = boundedSize;
     }, [maxBufferLength, isEmbed]);
 
     return {
