@@ -1,3 +1,13 @@
+# VODplus v0.9.5 - Play Page Navigation & Playback Speedup
+
+## Features & Optimizations
+- **Instant Skeleton Loading**: Added page-level `loading.tsx` skeleton for `/movie/[sourceId]/[id]`. Clicking video cards now navigates instantly (0ms UI lag) with a glassmorphism player loading skeleton.
+- **Dedicated Detail API & Prefetch Fix**: Added `/api/vod/detail` route and fixed `MovieCard` prefetching to call the detail route and pre-import `hls.js` on hover/touch.
+- **Server Request Deduplication**: Wrapped `getMovieDetail` with React `cache()` for per-request SSR deduplication and normalized `unstable_cache` keys.
+- **Optimized Initial Buffer**: Reduced default initial buffer length (`DEFAULT_BUFFER_LENGTH`) from 30s to 15s for faster initial video playback start.
+
+---
+
 # VODplus v0.9.4 - Thumbnail Loading Speed
 
 ## Features & Optimizations

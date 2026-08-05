@@ -8,6 +8,7 @@ import { normalizeVodResponse } from './normalizer';
 import { CONFIG } from '@/config/config';
 import { withErrorHandling } from './errorHandler';
 import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 import { logger } from '../logger';
 
 // Request deduplication cache to prevent duplicate simultaneous requests
@@ -172,14 +173,20 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
     return res.list[0] || null;
 }
 
-// Cached version to prevent double-fetching from generateMetadata + page component
-export const cachedGetMovieDetail = unstable_cache(
-    async (sourceId: string, id: string, disabledSources: string[]) => {
+const internalCachedGetMovieDetail = unstable_cache(
+    async (sourceId: string, id: string, disabledSourcesKey: string) => {
+        const disabledSources = disabledSourcesKey ? disabledSourcesKey.split(',') : [];
         return getMovieDetail(sourceId, id, disabledSources);
     },
-    ['movie-detail-v1'],
+    ['movie-detail-v2'],
     { revalidate: CONFIG.API_REVALIDATE_SECONDS }
 );
+
+// React.cache ensures per-request deduplication (e.g. generateMetadata + MovieDetail page component)
+export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, disabledSources: string[] = []) => {
+    const disabledSourcesKey = (disabledSources || []).slice().sort().join(',');
+    return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey);
+});
 
 function selectBestMatch(candidates: any[], targetName: string) {
     if (!candidates || candidates.length === 0) return null;

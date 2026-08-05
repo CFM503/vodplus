@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Movie } from '@/types';
 import { Play } from 'lucide-react';
@@ -26,21 +26,24 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
 
     const handlePrefetch = useCallback(() => {
         const { source_id, vod_id, isDiscoverySrc: isDisc } = movieIdRef.current;
-        if (hasPrefetchedRef.current || !source_id || !vod_id || isDisc) return;
+        if (hasPrefetchedRef.current || !source_id || !vod_id) return;
         hasPrefetchedRef.current = true;
-        fetch(`/api/vod/latest?source=${encodeURIComponent(source_id)}&id=${encodeURIComponent(vod_id)}`, {
+
+        // Preload hls.js module in browser cache ahead of navigation
+        import('hls.js').catch(() => { });
+
+        if (isDisc) return;
+
+        fetch(`/api/vod/detail?source=${encodeURIComponent(source_id)}&id=${encodeURIComponent(vod_id)}`, {
             priority: 'low',
             cache: 'force-cache'
         })
             .then(res => res.json())
             .then(data => {
-                if (data && data.list && data.list.length > 0) {
-                    const detail = data.list[0];
-                    if (detail && detail.vod_play_url) {
-                        const episodes = parseVodPlayUrl(detail.vod_play_url);
-                        if (episodes.length > 0 && episodes[0].url) {
-                            fetch(episodes[0].url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
-                        }
+                if (data && data.data && data.data.vod_play_url) {
+                    const episodes = parseVodPlayUrl(data.data.vod_play_url);
+                    if (episodes.length > 0 && episodes[0].url) {
+                        fetch(episodes[0].url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
                     }
                 }
             })
