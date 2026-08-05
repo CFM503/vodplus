@@ -1,10 +1,10 @@
-﻿import { fetchWithTimeout } from '../utils';
+import { fetchWithTimeout } from '../utils';
 import { ApiResponse } from '@/types';
 import { ResourceSite } from '../resources';
 import { CONFIG } from '@/config/config';
 import { logger } from '../logger';
 
-export async function fetchRawFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<unknown> {
+export async function fetchRawFromSource(source: ResourceSite, params: string = '', noStore = false, timeoutOverride?: number): Promise<unknown> {
     const url = `${source.baseUrl}${params}`;
 
     // noStore=true for real-time search (always fresh); false for home/detail pages (cacheable)
@@ -12,7 +12,7 @@ export async function fetchRawFromSource(source: ResourceSite, params: string = 
         ? { cache: 'no-store' as RequestCache }
         : { next: { revalidate: CONFIG.API_REVALIDATE_SECONDS } };
 
-    const timeout = CONFIG.SOURCE_TIMEOUT_MAP?.[source.id] || CONFIG.SEARCH_TIMEOUT;
+    const timeout = timeoutOverride || CONFIG.SOURCE_TIMEOUT_MAP?.[source.id] || CONFIG.SEARCH_TIMEOUT;
     try {
         const res = await fetchWithTimeout(url, timeout, cacheOptions);
         const text = await res.text();

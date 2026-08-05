@@ -126,7 +126,7 @@ export function useVideoEvents({
                 const nextUrl = nextEpisodeUrlRef.current;
                 if (nextUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 60) {
                     hasPrefetchedNextRef.current = true;
-                    fetch(nextUrl, { mode: 'cors' }).catch(() => { /* ignore */ });
+                    fetch(nextUrl, { mode: 'no-cors', priority: 'low' }).catch(() => { /* ignore */ });
 
                     if ('connection' in navigator) {
                         const conn = (navigator as { connection?: { effectiveType?: string } }).connection;

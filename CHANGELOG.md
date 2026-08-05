@@ -1,3 +1,15 @@
+# VODplus v0.9.6 - Speed & Playback Optimization
+
+## Features & Optimizations
+- **SSR For All Sources**: Enabled SSR (Server-Side Rendering) for all traditional video sources in `/latest` library list page, resulting in instant navigation and pre-rendered HTML fallback.
+- **Deterministic String Cache Keys**: Refactored `unstable_cache` parameter keys on the homepage to use serialized `disabledSourcesKey` strings, ensuring 100% stable cache matching.
+- **Resilient Fast Timeout (LIST_TIMEOUT)**: Added a 4000ms timeout guard for list and category loads (`LIST_TIMEOUT`) to prevent slow/down traditional sources from hanging SSR.
+- **HLS.js Playback Parameters Fine-Tuning**: Enabled fragment prefetching (`startFragPrefetch: true`), shortened network retry delays, and adjusted watchdog/buffer-hole thresholds to ensure smooth playback in weak networks.
+- **Active Card Stall Recovery**: Reduced stall threshold (`STALL_THRESHOLD_MS`) to 3000ms (from 8000ms) for snappy auto-seeking recovery during connection stutters.
+- **CORS Prefetch Optimization**: Switched next episode preloading to `no-cors` mode to prevent browser console errors from cross-domain sources.
+
+---
+
 # VODplus v0.9.5 - Play Page Navigation & Playback Speedup
 
 ## Features & Optimizations

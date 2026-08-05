@@ -27,12 +27,12 @@ function dedupFetch<T>(key: string, fetchFn: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-export async function fetchFromSource(source: ResourceSite, params: string = '', noStore = false): Promise<ApiResponse> {
-    const cacheKey = `${source.id}:${params}:${noStore}`;
+export async function fetchFromSource(source: ResourceSite, params: string = '', noStore = false, timeoutOverride?: number): Promise<ApiResponse> {
+    const cacheKey = `${source.id}:${params}:${noStore}:${timeoutOverride || ''}`;
     return dedupFetch(cacheKey, async () => {
         const startTime = Date.now();
         try {
-            const data = await fetchRawFromSource(source, params, noStore);
+            const data = await fetchRawFromSource(source, params, noStore, timeoutOverride);
             const duration = Date.now() - startTime;
             return normalizeVodResponse(data, source, duration);
         } catch (error) {
@@ -79,7 +79,7 @@ export async function getRecentMovies(sourceId: string = 'feifan', page: number 
     }
 
     const source = RESOURCE_SITES.find(s => s.id === sourceId) || RESOURCE_SITES[0];
-    return fetchFromSource(source, `?ac=detail&pg=${page}&t=`);
+    return fetchFromSource(source, `?ac=detail&pg=${page}&t=`, false, CONFIG.LIST_TIMEOUT || 4000);
 }
 
 export async function getMovieDetail(sourceId: string, id: string, disabledSources: string[] = []) {
@@ -246,7 +246,7 @@ async function fetchMixedCategory(typeId: number, page: number = 1, limit: numbe
     if (sources.length === 0) return [];
     try {
         const promises = sources.map(s =>
-            fetchFromSource(s, `?ac=detail&pg=${page}&t=${typeId}`)
+            fetchFromSource(s, `?ac=detail&pg=${page}&t=${typeId}`, false, CONFIG.LIST_TIMEOUT || 4000)
                 .then(res => res.list)
                 .catch(() => [])
         );

@@ -14,6 +14,8 @@ export const CONFIG = {
     // 3. 首页/片库页的分类数据加载 (getRecentMovies, fetchMixedCategory)
     // 注意：调大此值可提高成功率，但会增加无结果时的等待时间
     SEARCH_TIMEOUT: 10000,
+    // 列表/分类接口快速超时时间 (毫秒)，防止慢源站长时间挂起 SSR 渲染
+    LIST_TIMEOUT: 4000,
 
     // 特定资源源的超时时间（毫秒），未配置的源沿用SEARCH_TIMEOUT
     SOURCE_TIMEOUT_MAP: {
@@ -93,8 +95,8 @@ export const CONFIG = {
     HLS_TIMEOUT: 10000,
 
     // 播放卡死检测阈值 (毫秒)
-    // waiting 状态持续超过此时间，触发跳过恢复
-    STALL_THRESHOLD_MS: 8000,
+    // waiting 状态持续超过此时间，触发跳过恢复 (调整为 3000ms 快速响应恢复)
+    STALL_THRESHOLD_MS: 3000,
 
     // 卡死时跳过秒数
     STALL_SKIP_SECONDS: 5,

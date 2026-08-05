@@ -97,19 +97,16 @@ export default async function LatestPage({ searchParams }: PageProps) {
     );
 }
 
-// Wrapper to handle server-side data fetching for TMDB
+// Wrapper to handle server-side data fetching for all sources
 import { getRecentMovies } from '@/lib/services/vodService';
 
 async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources, customLocalUrl }: { sourceId: string; pageNum: number; mediaType: 'movie' | 'tv'; disabledSources: string[]; customLocalUrl: string }) {
     let initialData = null;
 
-    // Server-side fetch ONLY for TMDB to support region proxies
-    if (sourceId === 'tmdb') {
-        try {
-            initialData = await getRecentMovies(sourceId, pageNum, mediaType, disabledSources, customLocalUrl);
-        } catch (e) {
-            logger.error('LatestPage', 'SSR Fetch Error for TMDB:', e);
-        }
+    try {
+        initialData = await getRecentMovies(sourceId, pageNum, mediaType, disabledSources, customLocalUrl);
+    } catch (e) {
+        logger.error('LatestPage', `SSR Fetch Error for ${sourceId}:`, e);
     }
 
     return (

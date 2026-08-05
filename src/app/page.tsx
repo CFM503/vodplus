@@ -1,4 +1,4 @@
-﻿import { Suspense } from "react";
+import { Suspense } from "react";
 import { Header } from "@/components/Header";
 import { HomeSection } from "@/components/home/HomeSection";
 import { HomeSkeleton } from "@/components/home/HomeSkeleton";
@@ -24,50 +24,66 @@ export const metadata = {
 export const fetchCache = "force-no-store";
 
 const getCachedTrendingMovies = unstable_cache(
-  async (s, ds, cul) => getTrendingMovies(s, ds, cul),
-  ["trending-movies"],
+  async (s, dsKey, cul) => {
+    const ds = dsKey ? dsKey.split(",") : [];
+    return getTrendingMovies(s, ds, cul);
+  },
+  ["trending-movies-v2"],
   { revalidate: CONFIG.TRENDING_REVALIDATE, tags: ["trending"] }
 );
 
 const getCachedTrendingTv = unstable_cache(
-  async (s, ds, cul) => getTrendingTv(s, ds, cul),
-  ["trending-tv"],
+  async (s, dsKey, cul) => {
+    const ds = dsKey ? dsKey.split(",") : [];
+    return getTrendingTv(s, ds, cul);
+  },
+  ["trending-tv-v2"],
   { revalidate: CONFIG.TRENDING_REVALIDATE, tags: ["trending"] }
 );
 
 const getCachedNewestAction = unstable_cache(
-  async (ds, cul) => getNewestAction(ds, cul),
-  ["newest-action"],
+  async (dsKey, cul) => {
+    const ds = dsKey ? dsKey.split(",") : [];
+    return getNewestAction(ds, cul);
+  },
+  ["newest-action-v2"],
   { revalidate: CONFIG.CATEGORY_REVALIDATE, tags: ["latest"] }
 );
 
 const getCachedNewestTv = unstable_cache(
-  async (ds, cul) => getNewestTv(ds, cul),
-  ["newest-tv"],
+  async (dsKey, cul) => {
+    const ds = dsKey ? dsKey.split(",") : [];
+    return getNewestTv(ds, cul);
+  },
+  ["newest-tv-v2"],
   { revalidate: CONFIG.CATEGORY_REVALIDATE, tags: ["latest"] }
 );
 
 async function TrendingMoviesSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
-  const list = await getCachedTrendingMovies(source, disabledSources, customLocalUrl);
+  const dsKey = disabledSources.join(",");
+  const list = await getCachedTrendingMovies(source, dsKey, customLocalUrl);
   if (!list || list.length === 0) return null;
   // Only the first above-the-fold section gets priority image loading
   return <HomeSection title={source === "tmdb" ? "今日趋势 (电影)" : "热门电影 (本地)"} list={list} iconColor="indigo" priorityCount={6} />;
 }
 
 async function ActionSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
-  const list = await getCachedNewestAction(disabledSources, customLocalUrl);
+  const dsKey = disabledSources.join(",");
+  const list = await getCachedNewestAction(dsKey, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title="最新入库 (动作片)" list={list} iconColor="orange" />;
 }
 
 async function TrendingTvSection({ source, disabledSources, customLocalUrl }: { source: string; disabledSources: string[]; customLocalUrl: string }) {
-  const list = await getCachedTrendingTv(source, disabledSources, customLocalUrl);
+  const dsKey = disabledSources.join(",");
+  const list = await getCachedTrendingTv(source, dsKey, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title={source === "tmdb" ? "今日趋势 (电视剧)" : "热门剧集 (本地)"} list={list} iconColor="emerald" />;
 }
 
 async function NewestTvSection({ disabledSources, customLocalUrl }: { disabledSources: string[]; customLocalUrl: string }) {
-  const list = await getCachedNewestTv(disabledSources, customLocalUrl);
+  const dsKey = disabledSources.join(",");
+  const list = await getCachedNewestTv(dsKey, customLocalUrl);
   if (!list || list.length === 0) return null;
   return <HomeSection title="最新入库 (国产剧)" list={list} iconColor="pink" />;
 }
