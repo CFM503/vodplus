@@ -53,8 +53,21 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         if (typeof window !== "undefined") {
             const saved = localStorage.getItem("VOD_MAX_BUFFER_LENGTH");
             if (saved) return parseInt(saved, 10);
+
+            // Network-adaptive buffering strategy fallback (for weak network and data saver)
+            if ('connection' in navigator) {
+                const conn = (navigator as any).connection;
+                if (conn) {
+                    if (conn.effectiveType === '2g' || conn.effectiveType === '3g') {
+                        return 8; // Weak network -> shorter buffer (8s) prevents fragment queue backlog
+                    }
+                    if (conn.saveData) {
+                        return 10; // Save data mode -> 10s buffer
+                    }
+                }
+            }
         }
-        return CONFIG.DEFAULT_BUFFER_LENGTH;
+        return CONFIG.DEFAULT_BUFFER_LENGTH || 15;
     });
     const [videoScale, setVideoScale] = useState(() => {
         if (typeof window !== "undefined") {

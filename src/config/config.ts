@@ -87,12 +87,12 @@ export const CONFIG = {
     BUFFER_ADAPTIVE: true,
     BUFFER_LOW_BW: 5,
     BUFFER_HIGH_BW: 20,
-    HLS_FRAGMENT_TRY_TIMEOUT: 20000,
+    // HLS 分片拉取最大重试超时 (毫秒)
+    HLS_FRAGMENT_TRY_TIMEOUT: 10000,
 
 
-    // HLS 分片拉取超时时间 (毫秒)
-    // 网络差时建议调大
-    HLS_TIMEOUT: 10000,
+    // HLS 清单/层级加载超时时间 (毫秒)
+    HLS_TIMEOUT: 6000,
 
     // 播放卡死检测阈值 (毫秒)
     // waiting 状态持续超过此时间，触发跳过恢复 (调整为 3000ms 快速响应恢复)

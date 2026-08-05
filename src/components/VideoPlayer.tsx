@@ -184,7 +184,7 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
                 className="absolute inset-0 w-full h-full object-contain bg-black"
                 poster={poster}
                 playsInline
-                preload="metadata"
+                preload="auto"
                 crossOrigin="anonymous"
                 muted={isMuted}
                 style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center' }}

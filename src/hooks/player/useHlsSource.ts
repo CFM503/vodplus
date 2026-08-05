@@ -82,6 +82,8 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         enableWorker: true,
                         maxBufferLength: CONFIG.BUFFER_ADAPTIVE ? Math.min(maxBufferLength, CONFIG.BUFFER_HIGH_BW) : maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
+                        // 限制最大缓冲区大小为 30MB，防止高速带宽下无限制缓存消耗内存
+                        maxBufferSize: 30 * 1024 * 1024,
                         backBufferLength: 90,
                         lowLatencyMode: false,
                         manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
@@ -90,15 +92,20 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         levelLoadingMaxRetry: 4,
                         levelLoadingRetryDelay: 500,
-                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 20000,
+                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 10000,
                         fragLoadingMaxRetry: 6,
                         fragLoadingRetryDelay: 1000,
                         startFragPrefetch: true,
                         maxBufferHole: 0.8,
                         highBufferWatchdogPeriod: 2.0,
                         testBandwidth: false,
-                        abrEwmaFastLive: 3.0,
-                        abrEwmaSlowLive: 10.0,
+                        // 保守的初始带宽预估值 (1 Mbps)，防止起播阶段拉取超大分片导致起播慢
+                        abrEwmaDefaultEstimate: 1000000,
+                        // 加快 VoD 场景下带宽感知的灵敏度
+                        abrEwmaFastVoD: 1.0,
+                        abrEwmaSlowVoD: 5.0,
+                        // ABR 码率保守系数，保障起播与切换稳定性
+                        abrBandWidthFactor: 0.9,
                         xhrSetup: function (xhr: XMLHttpRequest) {
                             xhr.withCredentials = false;
                         },

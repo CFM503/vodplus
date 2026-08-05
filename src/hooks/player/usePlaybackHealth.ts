@@ -64,6 +64,21 @@ export function usePlaybackHealth({ videoRef, hlsRef, showToast }: UsePlaybackHe
       // readyState === 0 (HAVE_NOTHING) 也需要尝试跳过，因为可能一直无法加载
       if (video.readyState < 3) {
         recoveringRef.current = true;
+
+        // Force Hls.js to reload data if it gets stuck
+        const hls = hlsRef.current;
+        if (hls) {
+            logger.info('Stall detected: forcing HLS.js startLoad');
+            hls.startLoad();
+
+            // Active quality downgrade: if we have stalled and skipped repeatedly,
+            // manually drop quality level to ease network load
+            if (skipCountRef.current >= 1 && hls.currentLevel > 0) {
+                hls.currentLevel = hls.currentLevel - 1;
+                logger.info(`Stall count ${skipCountRef.current}: manually downgraded HLS quality level to ${hls.currentLevel}`);
+            }
+        }
+
         skipStall();
       }
     }, CONFIG.STALL_THRESHOLD_MS);

@@ -1,3 +1,15 @@
+# VODplus v0.9.7 - Advanced Video Playback Experience
+
+## Features & Optimizations
+- **Aggressive Preloading**: Changed video element preload parameter to `preload="auto"` to trigger eager metadata and initial segment downloads for native/MP4 playback.
+- **Dynamic Network-Adaptive Buffer Length**: Automatically senses network conditions (`2g`/`3g`/`saveData`) on start and scales initial buffer down to `8s`/`10s` to prevent fragment backlog congestion, keeping setting memory functional.
+- **ABR Bitrate Conservative Tuning**: Implemented `abrEwmaDefaultEstimate` at 1 Mbps to force conservative 480p/540p initial chunk starts (near-0s startup) followed by instant smooth upgrades, and adjusted fast/slow VoD EWMA parameters.
+- **Buffer Size Restriction**: Added `maxBufferSize: 30MB` limit to safeguard system memory during broadband downloads.
+- **HLS.js Timeout Reduction**: Reduced level and manifest timeout limits to `6000ms`, and fragment loading timeouts to `10000ms` (from `20000ms`) to trigger faster recovery.
+- **Cascading HLS Quality Downgrade**: Enabled card stall recovery to trigger `hls.startLoad()` and actively drop HLS quality level by 1 upon repeated stutters to adapt to sudden bandwidth drops.
+
+---
+
 # VODplus v0.9.6 - Speed & Playback Optimization
 
 ## Features & Optimizations
