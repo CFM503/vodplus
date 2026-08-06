@@ -38,10 +38,12 @@ interface VideoPlayerProps {
     hasPrevEpisode?: boolean;
     hasNextEpisode?: boolean;
     nextEpisodeUrl?: string;
+    initialSeekTime?: number;
+    onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
 }
 
-export default function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl }: VideoPlayerProps) {
-    const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl });
+export default function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate }: VideoPlayerProps) {
+    const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl, initialSeekTime, onTimeUpdate });
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleMouseMove, handleTouchStart, handleTouchMove,

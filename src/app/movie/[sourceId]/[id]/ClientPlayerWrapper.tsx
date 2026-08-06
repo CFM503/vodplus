@@ -50,6 +50,12 @@ export default function ClientPlayerWrapper({
     const [currentEpIndex, setCurrentEpIndex] = useState(0);
     const [clientCandidates, setClientCandidates] = useState<NonNullable<Movie['candidates']>>(candidates || []);
     const [isMatching, setIsMatching] = useState(false);
+
+    // Track real-time playback state (currentTime and playing status) for line switching progress recovery
+    const playbackStateRef = useRef<{ currentTime: number; isPlaying: boolean }>({ currentTime: 0, isPlaying: true });
+    const [pendingSeekTime, setPendingSeekTime] = useState<number | undefined>(undefined);
+    const [pendingAutoplay, setPendingAutoplay] = useState<boolean>(true);
+
     const gridRef = useRef<HTMLDivElement>(null);
 
     const currentEp = episodes[currentEpIndex];
@@ -180,10 +186,14 @@ export default function ClientPlayerWrapper({
 
         const currentEp = episodes[currentEpIndex];
         let nextIndex = -1;
+        let isSameEpisode = false;
 
         if (currentEp) {
             // 1. Exact name match
             nextIndex = nextEpisodes.findIndex(ep => ep.name === currentEp.name);
+            if (nextIndex !== -1) {
+                isSameEpisode = true;
+            }
 
             // 2. Numeric / Fuzzy match (e.g. "第1集" vs "01")
             if (nextIndex === -1) {
@@ -194,6 +204,9 @@ export default function ClientPlayerWrapper({
                 const targetNum = cleanNum(currentEp.name);
                 if (targetNum !== null) {
                     nextIndex = nextEpisodes.findIndex(ep => cleanNum(ep.name) === targetNum);
+                    if (nextIndex !== -1) {
+                        isSameEpisode = true;
+                    }
                 }
             }
         }
@@ -206,30 +219,47 @@ export default function ClientPlayerWrapper({
             nextIndex = 0;
         }
 
+        const { currentTime, isPlaying } = playbackStateRef.current;
+        if (isSameEpisode && currentTime > 5) {
+            setPendingSeekTime(currentTime);
+            setPendingAutoplay(isPlaying);
+        } else {
+            setPendingSeekTime(undefined);
+            setPendingAutoplay(true);
+        }
+
         setEpisodes(nextEpisodes);
         setCurrentSourceId(line.source_id);
         setCurrentEpIndex(nextIndex);
     }, [currentSourceId, episodes, currentEpIndex]);
 
     const handleEpisodeEnd = useCallback(() => {
+        setPendingSeekTime(undefined);
+        setPendingAutoplay(true);
         if (hasNext) {
             setCurrentEpIndex(prev => prev + 1);
         }
     }, [hasNext]);
 
     const handlePrevEpisode = useCallback(() => {
+        setPendingSeekTime(undefined);
+        setPendingAutoplay(true);
         if (hasPrev) {
             setCurrentEpIndex(prev => prev - 1);
         }
     }, [hasPrev]);
 
     const handleNextEpisode = useCallback(() => {
+        setPendingSeekTime(undefined);
+        setPendingAutoplay(true);
         if (hasNext) {
             setCurrentEpIndex(prev => prev + 1);
         }
     }, [hasNext]);
 
     const handleJumpToEpisode = useCallback((idx: number) => {
+        setPendingSeekTime(undefined);
+        setPendingAutoplay(true);
         setCurrentEpIndex(idx);
         if (gridRef.current) {
             const button = gridRef.current.querySelector(`[data-ep-idx="${idx}"]`) as HTMLElement;
@@ -267,12 +297,16 @@ export default function ClientPlayerWrapper({
                         poster={poster}
                         title={currentEp.name}
                         onEnded={handleEpisodeEnd}
-                        autoplay={true}
+                        autoplay={pendingAutoplay}
                         onPrevEpisode={handlePrevEpisode}
                         onNextEpisode={handleNextEpisode}
                         hasPrevEpisode={hasPrev}
                         hasNextEpisode={hasNext}
                         nextEpisodeUrl={hasNext ? episodes[currentEpIndex + 1].url : undefined}
+                        initialSeekTime={pendingSeekTime}
+                        onTimeUpdate={(c, _d, p) => {
+                            playbackStateRef.current = { currentTime: c, isPlaying: p };
+                        }}
                     />
                 ) : (
                     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/5">

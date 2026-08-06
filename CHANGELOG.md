@@ -1,3 +1,13 @@
+# VODplus v0.9.19 - Seamless Line Switch Playback Progress Recovery
+
+## Features & Optimizations
+- **Line Switch Progress Memory**: Captured real-time `currentTime` and `isPlaying` state in `ClientPlayerWrapper.tsx` during line switching. If the target line matches the current episode (exact or numeric fuzzy match), the player seamlessly seeks to `currentTime` on the new stream.
+- **Continuous Playback Restoration**: Preserved `isPlaying` state across line switches so that active playback automatically resumes upon stream load without requiring manual click.
+- **Priority Progress Override**: Enhanced `useVideoPlayer` to prioritize `initialSeekTime` over `localStorage` progress during one-time line switch operations, with duration clamping (`Math.min(initialSeekTime, duration - 1)`).
+- **Episode Fallback Protection**: Cleared `pendingSeekTime` when line switching falls back to an unmatched episode or when manually jumping episodes in the grid, ensuring non-matched episodes start clean from 0.
+
+---
+
 # VODplus v0.9.18 - Client-Side Distributed Cross-Source Line Matching Architecture
 
 ## Features & Optimizations

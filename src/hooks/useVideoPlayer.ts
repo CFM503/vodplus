@@ -15,6 +15,8 @@ interface VideoPlayerProps {
     onEnded?: () => void;
     autoplay?: boolean;
     nextEpisodeUrl?: string;
+    initialSeekTime?: number;
+    onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
 }
 
 interface GestureHUDState {
@@ -28,7 +30,7 @@ interface ToastState {
     visible: boolean;
 }
 
-export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl }: VideoPlayerProps) {
+export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate }: VideoPlayerProps) {
     // ===========================
     // Shared Refs
     // ===========================
@@ -192,6 +194,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
         setIsMuted,
         isLoading: hlsSource.isLoading,
         hasPrefetchedNextRef: hlsSource.hasPrefetchedNextRef,
+        onTimeUpdate,
     });
 
     // 4. Gestures
@@ -310,6 +313,19 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl 
             if (hasRestoredProgressRef.current) return;
             hasRestoredProgressRef.current = true;
 
+            // 1. 切源记忆进度最高优先级
+            if (initialSeekTime && initialSeekTime > 5) {
+                const maxSeek = video.duration ? Math.max(0, video.duration - 1) : initialSeekTime;
+                const targetTime = Math.min(initialSeekTime, maxSeek);
+                if (targetTime > 0) {
+                    video.currentTime = targetTime;
+                    showToast(`已为您恢复切源播放进度：${formatTime(targetTime)}`);
+                    hlsSource.hasSkippedIntroRef.current = true;
+                    return;
+                }
+            }
+
+            // 2. 本地历史进度恢复
             const key = getProgressKey(url);
             const savedTimeStr = localStorage.getItem(key);
             const savedTime = savedTimeStr ? parseFloat(savedTimeStr) : 0;

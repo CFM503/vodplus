@@ -22,17 +22,24 @@ interface UseVideoEventsProps {
     setIsMuted: React.Dispatch<React.SetStateAction<boolean>>;
     isLoading: boolean;
     hasPrefetchedNextRef: React.RefObject<boolean>;
+    onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
 }
 
 export function useVideoEvents({
     url, videoRef, onEnded, autoplay, nextEpisodeUrl,
     playbackRate, volume, isMuted, setIsMuted, isLoading, hasPrefetchedNextRef,
+    onTimeUpdate
 }: UseVideoEventsProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
     const [progress, setProgressState] = useState(0);
     const [duration, setDuration] = useState(0);
     const [buffered, setBuffered] = useState(0);
+
+    const onTimeUpdateRef = useRef(onTimeUpdate);
+    useEffect(() => {
+        onTimeUpdateRef.current = onTimeUpdate;
+    }, [onTimeUpdate]);
 
     // Stable ref for nextEpisodeUrl to avoid stale closure in event listeners
     const nextEpisodeUrlRef = useRef(nextEpisodeUrl);
@@ -115,6 +122,10 @@ export function useVideoEvents({
                 const currentProgressPercent = (video.currentTime / video.duration) * 100;
                 setProgressState(currentProgressPercent);
                 updateBuffered();
+
+                if (onTimeUpdateRef.current) {
+                    onTimeUpdateRef.current(video.currentTime, video.duration, !video.paused);
+                }
 
                 // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，避免记录片头片尾的无效位置）到 localStorage
                 if (video.currentTime > 5 && video.currentTime < video.duration - 5) {
