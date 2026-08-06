@@ -1,3 +1,13 @@
+# VODplus v0.9.14 - Client-side Multi-Line Source Switching
+
+## Features & Optimizations
+- **Line Switching UI Controls**: Added a "Line Selection" bar above the episode grid in `ClientPlayerWrapper.tsx` that appears when 2 or more candidate lines are available.
+- **Stateful Video Switching**: Upgraded `episodes` and `currentSourceId` parameters to React state variables, enabling dynamic client-side line swapping without reloading the page.
+- **Smart Episode Recovery**: Implemented a smart recovery algorithm when switching lines that matches the active episode by name (handling fuzzy numeric formats like "第1集" vs "01"), falling back to matching by index, and defaulting to the first episode.
+- **Robust Line List Consolidation**: Automatically validates that the currently playing line is included in the candidate lines list, preventing duplicates or omissions.
+
+---
+
 # VODplus v0.9.13 - Click-to-Play Parallel Matching Speedup
 
 ## Features & Optimizations

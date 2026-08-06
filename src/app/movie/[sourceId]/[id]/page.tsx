@@ -107,7 +107,13 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
                 {/* Player Section - Top Priority for Mobile */}
                 <div className="mb-8">
                     {safeEpisodes.length > 0 ? (
-                        <ClientPlayerWrapper episodes={safeEpisodes} poster={movie.vod_pic} />
+                        <ClientPlayerWrapper
+                            episodes={safeEpisodes}
+                            poster={movie.vod_pic}
+                            candidates={movie.candidates || []}
+                            initialSourceId={movie.source_id || sourceId}
+                            initialSourceName={movie.vod_play_from || ''}
+                        />
                     ) : (
                         <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center border border-white/10">
                             <span className="text-slate-500">视频源不可用</span>

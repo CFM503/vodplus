@@ -4,7 +4,8 @@ import { useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { PlayCircle, Loader2 } from 'lucide-react';
-import { Episode } from '@/types';
+import { Episode, Movie } from '@/types';
+import { parseVodPlayUrl } from '@/lib/vodParser';
 
 const VideoPlayer = dynamic(
   () => import('@/components/VideoPlayer').then((mod) => mod.default),
@@ -22,13 +23,90 @@ const VideoPlayer = dynamic(
 
 const EPISODE_WINDOW = 40;
 
-export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Episode[]; poster: string }) {
+export default function ClientPlayerWrapper({
+    episodes: initialEpisodes,
+    poster,
+    candidates = [],
+    initialSourceId = '',
+    initialSourceName = ''
+}: {
+    episodes: Episode[];
+    poster: string;
+    candidates?: NonNullable<Movie['candidates']>;
+    initialSourceId?: string;
+    initialSourceName?: string;
+}) {
+    const [episodes, setEpisodes] = useState(initialEpisodes);
+    const [currentSourceId, setCurrentSourceId] = useState(initialSourceId);
     const [currentEpIndex, setCurrentEpIndex] = useState(0);
     const gridRef = useRef<HTMLDivElement>(null);
 
     const currentEp = episodes[currentEpIndex];
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
+
+    // Filter or append the current source to candidates if missing
+    const allLines = useMemo(() => {
+        if (!candidates || candidates.length === 0) {
+            return [];
+        }
+        const hasCurrent = candidates.some(c => c.source_id === initialSourceId);
+        if (!hasCurrent && initialEpisodes.length > 0) {
+            const serializedPlayUrl = initialEpisodes.map(ep => `${ep.name}$${ep.url}`).join('#');
+            return [
+                {
+                    source_id: initialSourceId,
+                    source_name: initialSourceName || '默认线路',
+                    vod_id: '',
+                    vod_play_url: serializedPlayUrl,
+                    vod_play_from: initialSourceName || '默认线路'
+                },
+                ...candidates
+            ];
+        }
+        return candidates;
+    }, [candidates, initialSourceId, initialSourceName, initialEpisodes]);
+
+    const handleSwitchSource = useCallback((line: NonNullable<Movie['candidates']>[number]) => {
+        if (line.source_id === currentSourceId) return;
+
+        const nextEpisodes = parseVodPlayUrl(line.vod_play_url);
+        if (!nextEpisodes || nextEpisodes.length === 0) {
+            return;
+        }
+
+        const currentEp = episodes[currentEpIndex];
+        let nextIndex = -1;
+
+        if (currentEp) {
+            // 1. Exact name match
+            nextIndex = nextEpisodes.findIndex(ep => ep.name === currentEp.name);
+
+            // 2. Numeric / Fuzzy match (e.g. "第1集" vs "01")
+            if (nextIndex === -1) {
+                const cleanNum = (name: string) => {
+                    const numStr = name.replace(/[^\d]/g, '');
+                    return numStr ? parseInt(numStr, 10) : null;
+                };
+                const targetNum = cleanNum(currentEp.name);
+                if (targetNum !== null) {
+                    nextIndex = nextEpisodes.findIndex(ep => cleanNum(ep.name) === targetNum);
+                }
+            }
+        }
+
+        // 3. Fallback to same index (clamped) or 0
+        if (nextIndex === -1) {
+            nextIndex = Math.min(currentEpIndex, nextEpisodes.length - 1);
+        }
+        if (nextIndex === -1) {
+            nextIndex = 0;
+        }
+
+        setEpisodes(nextEpisodes);
+        setCurrentSourceId(line.source_id);
+        setCurrentEpIndex(nextIndex);
+    }, [currentSourceId, episodes, currentEpIndex]);
 
     const handleEpisodeEnd = useCallback(() => {
         if (hasNext) {
@@ -80,19 +158,58 @@ export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Ep
     return (
         <div className="space-y-6">
             <div className="rounded-xl overflow-hidden shadow-2xl bg-black">
-                <VideoPlayer
-                    url={currentEp.url}
-                    poster={poster}
-                    title={currentEp.name}
-                    onEnded={handleEpisodeEnd}
-                    autoplay={true}
-                    onPrevEpisode={handlePrevEpisode}
-                    onNextEpisode={handleNextEpisode}
-                    hasPrevEpisode={hasPrev}
-                    hasNextEpisode={hasNext}
-                    nextEpisodeUrl={hasNext ? episodes[currentEpIndex + 1].url : undefined}
-                />
+                {currentEp ? (
+                    <VideoPlayer
+                        url={currentEp.url}
+                        poster={poster}
+                        title={currentEp.name}
+                        onEnded={handleEpisodeEnd}
+                        autoplay={true}
+                        onPrevEpisode={handlePrevEpisode}
+                        onNextEpisode={handleNextEpisode}
+                        hasPrevEpisode={hasPrev}
+                        hasNextEpisode={hasNext}
+                        nextEpisodeUrl={hasNext ? episodes[currentEpIndex + 1].url : undefined}
+                    />
+                ) : (
+                    <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/5">
+                        <span className="text-slate-500 text-sm">该线路无有效剧集</span>
+                    </div>
+                )}
             </div>
+
+            {/* Line Selection */}
+            {allLines.length >= 2 && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            线路选择
+                            <span className="text-[10px] font-normal text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                                可用 {allLines.length} 个源
+                            </span>
+                        </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2 bg-slate-900/30 p-3.5 rounded-xl border border-white/5 max-h-32 overflow-y-auto custom-scrollbar">
+                        {allLines.map((line) => {
+                            const isCurrent = currentSourceId === line.source_id;
+                            return (
+                                <button
+                                    key={line.source_id}
+                                    onClick={() => handleSwitchSource(line)}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-lg transition-all border cursor-pointer",
+                                        isCurrent
+                                            ? "bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(79,70,229,0.4)]"
+                                            : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-slate-600"
+                                    )}
+                                >
+                                    {line.source_name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -103,9 +220,11 @@ export default function ClientPlayerWrapper({ episodes, poster }: { episodes: Ep
                             共 {totalEpisodes} 集{shouldWindow && ` (显示 ${windowEnd - windowStart} 集)`}
                         </span>
                     </h3>
-                    <div className="text-xs text-slate-400">
-                        正在播放: <span className="text-indigo-300 font-medium">{currentEp.name}</span>
-                    </div>
+                    {currentEp && (
+                        <div className="text-xs text-slate-400">
+                            正在播放: <span className="text-indigo-300 font-medium">{currentEp.name}</span>
+                        </div>
+                    )}
                 </div>
 
                 {shouldWindow && (
