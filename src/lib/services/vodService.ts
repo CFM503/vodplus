@@ -172,7 +172,7 @@ const internalCachedGetMovieDetail = unstable_cache(
         const disabledSources = disabledSourcesKey ? disabledSourcesKey.split(',') : [];
         return getMovieDetail(sourceId, id, disabledSources, nameHint);
     },
-    ['movie-detail-v2'],
+    ['movie-detail-v3'],
     { revalidate: CONFIG.DETAIL_REVALIDATE_SECONDS || 43200 }
 );
 
@@ -182,22 +182,45 @@ export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, d
     return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey, nameHint);
 });
 
+function isNameMatch(itemVodName: string, targetName: string): boolean {
+    if (!itemVodName || !targetName) return false;
+    const nameA = itemVodName.trim();
+    const nameB = targetName.trim();
+
+    if (nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA)) {
+        return true;
+    }
+
+    if (CONFIG.MATCH_CLEAN_TITLE) {
+        const clean = (str: string) => str.replace(/[\(（\[【].*?[\)）\]】]/g, '').trim();
+        const cleanA = clean(nameA);
+        const cleanB = clean(nameB);
+        if (cleanA && cleanB && cleanA.length >= 2) {
+            if (cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 async function performRaceMatch(name: string, disabledSources: string[]) {
     const activeSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));
     const candidates: any[] = [];
-    const targetCount = CONFIG.MATCH_CANDIDATE_COUNT || 3;
+    const targetCount = CONFIG.MATCH_CANDIDATE_COUNT || 8;
 
     // Create a promise for each source search
     const searchPromises = activeSources.map(async (source) => {
         try {
             const searchUrl = source.searchPath.replace('ac=list', 'ac=detail');
             // Use a configurable timeout for candidate searches to avoid blocking SSR
-            const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, CONFIG.MATCH_SOURCE_TIMEOUT || 3000);
+            const res = await fetchFromSource(source, `${searchUrl}${encodeURIComponent(name)}`, false, CONFIG.MATCH_SOURCE_TIMEOUT || 3500);
 
             if (res && res.list && res.list.length > 0) {
                 // Find precise match within this source's results
                 const match = res.list.find((m: any) =>
-                    m.vod_play_url && (m.vod_name === name || m.vod_name.includes(name))
+                    m.vod_play_url && isNameMatch(m.vod_name, name)
                 );
 
                 if (match) {
@@ -210,35 +233,44 @@ async function performRaceMatch(name: string, disabledSources: string[]) {
         return null;
     });
 
-    // Custom "Race to N" implementation
-    // We wrap promises to resolve into a collector as they finish
+    // Race to N implementation with total timeout and source deduplication
     await new Promise<void>((resolve) => {
         let completed = 0;
         let found = 0;
         let resolved = false;
 
-        if (searchPromises.length === 0) resolve();
+        const totalTimeout = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        }, CONFIG.MATCH_TOTAL_TIMEOUT || 5500);
+
+        const finish = () => {
+            if (!resolved) {
+                resolved = true;
+                clearTimeout(totalTimeout);
+                resolve();
+            }
+        };
+
+        if (searchPromises.length === 0) finish();
 
         searchPromises.forEach(p => {
             p.then(result => {
                 if (resolved) return;
                 completed++;
                 if (result) {
-                    candidates.push(result);
-                    found++;
-                    // Fast Exact Match: If we get a 100% exact name match from a fast site,
-                    // resolve immediately to provide instant start without waiting for others.
-                    if (result.match.vod_name.trim() === name.trim()) {
-                        resolved = true;
-                        resolve();
-                        return;
+                    // Deduplicate by source_id so each site has at most 1 candidate
+                    if (!candidates.some(c => c.source.id === result.source.id)) {
+                        candidates.push(result);
+                        found++;
                     }
                 }
 
                 // Stop waiting if we have enough candidates OR all sources finished
                 if (found >= targetCount || completed === searchPromises.length) {
-                    resolved = true;
-                    resolve();
+                    finish();
                 }
             });
         });

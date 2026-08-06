@@ -1,3 +1,14 @@
+# VODplus v0.9.17 - Cross-Source Candidate Collection Alignment
+
+## Features & Optimizations
+- **Full Coverage Race Matching**: Removed the exact-match early exit in `performRaceMatch`, allowing candidate searches to continue collecting up to `MATCH_CANDIDATE_COUNT` (8) unique active sources, bringing play page candidates closer to full search coverage.
+- **Global Matching Timeout Guard**: Added `MATCH_TOTAL_TIMEOUT` (5.5s) to guarantee SSR responsiveness, resolving immediately when target candidate count is reached or total timeout expires.
+- **Flexible Title Matching**: Added `MATCH_CLEAN_TITLE` fuzzy matching that strips parentheses and brackets (e.g. matching `长安十二时辰(粤语)` with `长安十二时辰`).
+- **Cache Tag Upgrade**: Upgraded `unstable_cache` key tag to `movie-detail-v3` to bust legacy 1-candidate caches.
+- **Sanitized Source Name Displays**: Implemented `cleanInitialSourceName` in `ClientPlayerWrapper.tsx` to strip raw `$$$` delimiters from source label buttons.
+
+---
+
 # VODplus v0.9.16 - Filter Non-playable Yun/HTML Lines
 
 ## Features & Optimizations

@@ -49,6 +49,15 @@ export default function ClientPlayerWrapper({
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
 
+    // Clean initial source name if it contains $$$ separators
+    const cleanInitialSourceName = useMemo(() => {
+        if (!initialSourceName) return '默认线路';
+        if (initialSourceName.includes('$$$')) {
+            return initialSourceName.split('$$$')[0].trim() || '默认线路';
+        }
+        return initialSourceName.trim();
+    }, [initialSourceName]);
+
     // Expand current and candidate lines into multi-line play groups
     const allLines = useMemo(() => {
         const lines: { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }[] = [];
@@ -58,10 +67,10 @@ export default function ClientPlayerWrapper({
         currentGroups.forEach((g, idx) => {
             lines.push({
                 source_id: `${initialSourceId}-group-${idx}`,
-                source_name: `${initialSourceName}${currentGroups.length > 1 ? ' · ' + g.name : ''}`,
+                source_name: `${cleanInitialSourceName}${currentGroups.length > 1 ? ' · ' + g.name : ''}`,
                 vod_id: '',
                 vod_play_url: g.playUrl,
-                vod_play_from: initialSourceName
+                vod_play_from: cleanInitialSourceName
             });
         });
 
@@ -72,19 +81,20 @@ export default function ClientPlayerWrapper({
 
                 const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from);
                 cGroups.forEach((g, idx) => {
+                    const cBaseName = c.source_name ? c.source_name.split('$$$')[0].trim() : '其他线路';
                     lines.push({
                         source_id: `${c.source_id}-group-${idx}`,
-                        source_name: `${c.source_name}${cGroups.length > 1 ? ' · ' + g.name : ''}`,
+                        source_name: `${cBaseName}${cGroups.length > 1 ? ' · ' + g.name : ''}`,
                         vod_id: c.vod_id,
                         vod_play_url: g.playUrl,
-                        vod_play_from: c.vod_play_from || c.source_name
+                        vod_play_from: c.vod_play_from || cBaseName
                     });
                 });
             });
         }
 
         return lines;
-    }, [candidates, initialSourceId, initialSourceName, vodPlayUrl, vodPlayFrom]);
+    }, [candidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom]);
 
     const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
         if (line.source_id === currentSourceId) return;
