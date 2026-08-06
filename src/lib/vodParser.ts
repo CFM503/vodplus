@@ -1,5 +1,18 @@
 import { Episode, PlayGroup } from '@/types';
 
+export function isDirectPlayableUrl(url: string | undefined | null): boolean {
+    if (!url) return false;
+    const u = url.trim().toLowerCase();
+    if (!u.startsWith('http')) return false;
+    return u.includes('.m3u8') || u.includes('.mp4') || u.includes('.webm') || u.includes('.flv');
+}
+
+export function isDirectPlayableEpisodeList(episodes: Episode[]): boolean {
+    if (!episodes || episodes.length === 0) return false;
+    const ok = episodes.filter(e => isDirectPlayableUrl(e.url)).length;
+    return ok >= Math.ceil(episodes.length * 0.8);
+}
+
 export function parseSinglePlaylist(playlist: string): Episode[] {
     const cleanPlaylist = playlist.trim();
     if (!cleanPlaylist) return [];
@@ -38,23 +51,31 @@ export function parseVodPlayUrl(url: string | undefined | null): Episode[] {
     const rawUrl = url.trim();
     if (!rawUrl) return [];
 
-    // 1. Handle Multiple Playlists (separated by $$$)
-    // We prioritize .m3u8 playlists if multiple exist
     const playlists = rawUrl.split('$$$');
-    let activePlaylist = playlists[0] || '';
+    let bestPlaylist = '';
 
-    // Simple heuristic: prefer m3u8
-    for (const p of playlists) {
-        if (p.includes('.m3u8')) {
-            activePlaylist = p;
-            break;
+    // Loop through playlists and prioritize direct playable stream groups
+    for (const playlist of playlists) {
+        const episodes = parseSinglePlaylist(playlist);
+        if (isDirectPlayableEpisodeList(episodes)) {
+            if (!bestPlaylist || playlist.toLowerCase().includes('.m3u8')) {
+                bestPlaylist = playlist;
+                if (playlist.toLowerCase().includes('.m3u8')) {
+                    break;
+                }
+            }
         }
     }
 
-    const parsed = parseSinglePlaylist(activePlaylist);
+    // Fallback if no playlist passed direct-playable verification
+    if (!bestPlaylist && playlists.length > 0) {
+        bestPlaylist = playlists.find(p => p.toLowerCase().includes('.m3u8')) || playlists[0];
+    }
 
-    // Fallback: If parsing of the chosen playlist failed but rawUrl itself looks like a direct link
-    if (parsed.length === 0 && rawUrl.startsWith('http') && !rawUrl.includes('$') && !rawUrl.includes('#')) {
+    const parsed = parseSinglePlaylist(bestPlaylist);
+
+    // Fallback: If parsing failed but rawUrl itself is a direct playable link
+    if (parsed.length === 0 && isDirectPlayableUrl(rawUrl) && !rawUrl.includes('$') && !rawUrl.includes('#')) {
         parsed.push({ name: 'Play', url: rawUrl });
     }
 
@@ -75,15 +96,24 @@ export function parseVodPlayGroups(url: string | undefined | null, playFrom?: st
         const cleanPlaylist = playlist.trim();
         if (!cleanPlaylist) return;
 
-        const episodes = parseSinglePlaylist(cleanPlaylist);
-        if (episodes.length === 0) return;
-
         let name = '';
         if (fromParts[index]) {
             name = fromParts[index].trim();
         }
         if (!name) {
             name = `线路${index + 1}`;
+        }
+
+        // Safeguard: Filter out player indicator names containing 'yun' but lacking direct stream hints
+        const lowerFrom = name.toLowerCase();
+        if (lowerFrom.includes('yun') && !lowerFrom.includes('m3u8') && !lowerFrom.includes('mp4') && !lowerFrom.includes('webm')) {
+            return; // drop web/iframe yun player lines
+        }
+
+        const episodes = parseSinglePlaylist(cleanPlaylist);
+        // Filter out groups that fail direct playable checks
+        if (!isDirectPlayableEpisodeList(episodes)) {
+            return;
         }
 
         groups.push({

@@ -1,3 +1,12 @@
+# VODplus v0.9.16 - Filter Non-playable Yun/HTML Lines
+
+## Features & Optimizations
+- **Direct Stream Validation**: Added `isDirectPlayableUrl` and `isDirectPlayableEpisodeList` helper utilities to verify that playlist groups contain direct stream formats (`.m3u8`, `.mp4`, `.webm`, `.flv`).
+- **Yun Player Line Filtering**: Updated `parseVodPlayGroups` and `parseVodPlayUrl` to filter out HTML iframe player lines (such as `hnyun`, `jsyun`, `ffyun`) and non-stream groups, keeping only high-quality direct HLS/MP4 streams in the line switcher.
+- **Smart Primary Group Selection**: Refactored `parseVodPlayUrl` to prioritize direct playable `.m3u8` stream groups for default initial playback.
+
+---
+
 # VODplus v0.9.15 - Advanced Line Switching & Cross-Source Matching
 
 ## Features & Optimizations
