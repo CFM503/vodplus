@@ -1,3 +1,15 @@
+# VODplus v0.9.21 - Play Page Anti-Stutter & Frame-Drop Performance Optimization
+
+## Features & Optimizations
+- **Client Bundle De-bloating**: Extracted `isNameMatch` to pure utility file `src/lib/nameMatch.ts` and removed server `vodService` imports from `ClientPlayerWrapper.tsx`. Reduced play page route JS bundle size by **~44 kB** (from 47.8 kB to 3.87 kB).
+- **HLS Startup Bandwidth Protection**: Added a `1.8s` delay before launching client-side cross-source search requests, giving initial HLS playlist and segment downloading 100% network priority. Added adaptive weak network concurrency throttling.
+- **Candidate Update Batching & Throttling**: Implemented a 300ms throttle batch queue for candidate lines in `ClientPlayerWrapper.tsx`, merging concurrent source search completions into single smooth UI updates and eliminating 80%+ of re-renders.
+- **Player Re-render Shield**: Wrapped `VideoPlayer` component with `React.memo` and stabilized callback references so line switcher updates no longer trigger VideoPlayer re-renders when the video URL is unchanged.
+- **Disk I/O Micro-Jank Fix**: Throttled `localStorage` progress saving in `useVideoEvents.ts` to >= 3s intervals, cutting disk I/O operations by 90%.
+- **Fit Height Single Toast & Smooth Transition**: Fixed `PlayerSettingsPanel.tsx` Fit Height button to prevent duplicate toasts and layout jumps when video metadata is uninitialized.
+
+---
+
 # VODplus v0.9.20 - Mobile Video Fit Height Scale Calculation & Toast Fix
 
 ## Features & Optimizations

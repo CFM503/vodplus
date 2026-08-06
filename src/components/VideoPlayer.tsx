@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { Loader2, Play, Volume2, Sun, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
@@ -42,7 +42,7 @@ interface VideoPlayerProps {
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
 }
 
-export default function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate }: VideoPlayerProps) {
+function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate }: VideoPlayerProps) {
     const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl, initialSeekTime, onTimeUpdate });
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
@@ -303,3 +303,6 @@ export default function VideoPlayer({ url, poster, title, onEnded, autoplay = fa
         </div>
     );
 }
+
+const MemoizedVideoPlayer = memo(VideoPlayer);
+export default MemoizedVideoPlayer;

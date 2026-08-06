@@ -161,28 +161,8 @@ export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, d
     return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey, nameHint);
 });
 
-export function isNameMatch(itemVodName: string, targetName: string): boolean {
-    if (!itemVodName || !targetName) return false;
-    const nameA = itemVodName.trim();
-    const nameB = targetName.trim();
-
-    if (nameA === nameB || nameA.includes(nameB) || nameB.includes(nameA)) {
-        return true;
-    }
-
-    if (CONFIG.MATCH_CLEAN_TITLE) {
-        const clean = (str: string) => str.replace(/[\(（\[【].*?[\)）\]】]/g, '').trim();
-        const cleanA = clean(nameA);
-        const cleanB = clean(nameB);
-        if (cleanA && cleanB && cleanA.length >= 2) {
-            if (cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
+import { isNameMatch } from '@/lib/nameMatch';
+export { isNameMatch };
 
 async function performRaceMatch(name: string, disabledSources: string[]) {
     const activeSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));

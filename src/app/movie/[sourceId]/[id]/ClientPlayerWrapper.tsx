@@ -7,7 +7,7 @@ import { PlayCircle, Loader2 } from 'lucide-react';
 import { Episode, Movie, PlayGroup } from '@/types';
 import { parseVodPlayUrl, parseVodPlayGroups } from '@/lib/vodParser';
 import { RESOURCE_SITES } from '@/lib/resources';
-import { isNameMatch } from '@/lib/services/vodService';
+import { isNameMatch } from '@/lib/nameMatch';
 import { CONFIG } from '@/config/config';
 
 const VideoPlayer = dynamic(
@@ -62,7 +62,11 @@ export default function ClientPlayerWrapper({
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
 
-    // Asynchronous client-side cross-source search (fan-out pattern)
+    const handleTimeUpdate = useCallback((c: number, _d: number, p: boolean) => {
+        playbackStateRef.current = { currentTime: c, isPlaying: p };
+    }, []);
+
+    // Asynchronous client-side cross-source search (fan-out pattern with bandwidth yielding & batching)
     useEffect(() => {
         if (!movieName) return;
 
@@ -70,61 +74,106 @@ export default function ClientPlayerWrapper({
         const targetSites = RESOURCE_SITES.filter(s => s.id !== initialSourceId);
         if (targetSites.length === 0) return;
 
-        setIsMatching(true);
-        const limit = CONFIG.CLIENT_MATCH_CONCURRENCY || 5;
-        const queue = [...targetSites];
+        let startTimeoutId: NodeJS.Timeout | null = null;
+        let batchTimerId: NodeJS.Timeout | null = null;
+        const pendingQueue: NonNullable<Movie['candidates']> = [];
 
-        const fetchSiteCandidate = async (site: typeof RESOURCE_SITES[number]) => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONFIG.CLIENT_MATCH_TIMEOUT_MS || 5000);
+        const flushCandidates = () => {
+            if (pendingQueue.length === 0 || !isMounted) return;
+            const itemsToAdd = [...pendingQueue];
+            pendingQueue.length = 0;
 
-            try {
-                const res = await fetch(`/api/vod/search?source=${encodeURIComponent(site.id)}&wd=${encodeURIComponent(movieName)}`, {
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
+            setClientCandidates(prev => {
+                const existingIds = new Set(prev.map(c => c.source_id));
+                const newItems = itemsToAdd.filter(c => !existingIds.has(c.source_id));
+                if (newItems.length === 0) return prev;
+                return [...prev, ...newItems];
+            });
+        };
 
-                if (res.ok && isMounted) {
-                    const data = await res.json();
-                    if (data && data.list && data.list.length > 0) {
-                        const match = data.list.find((m: any) => m.vod_play_url && isNameMatch(m.vod_name, movieName));
-                        if (match && isMounted) {
-                            const newCandidate = {
-                                source_id: site.id,
-                                source_name: site.name,
-                                vod_id: match.vod_id,
-                                vod_play_url: match.vod_play_url,
-                                vod_play_from: match.vod_play_from || site.name
-                            };
+        const scheduleFlush = () => {
+            if (batchTimerId) return;
+            batchTimerId = setTimeout(() => {
+                batchTimerId = null;
+                flushCandidates();
+            }, 300); // 300ms batch throttle
+        };
 
-                            setClientCandidates(prev => {
-                                if (prev.some(c => c.source_id === site.id)) return prev;
-                                return [...prev, newCandidate];
-                            });
+        // Yield bandwidth to HLS player startup for 1.8s
+        startTimeoutId = setTimeout(() => {
+            if (!isMounted) return;
+            setIsMatching(true);
+
+            let limit = CONFIG.CLIENT_MATCH_CONCURRENCY || 3;
+            // Adaptively reduce concurrency on weak networks or data saver mode
+            if (typeof navigator !== 'undefined' && 'connection' in navigator) {
+                const conn = (navigator as any).connection;
+                if (conn && (conn.effectiveType === '2g' || conn.effectiveType === '3g' || conn.saveData)) {
+                    limit = 1;
+                }
+            }
+
+            const queue = [...targetSites];
+
+            const fetchSiteCandidate = async (site: typeof RESOURCE_SITES[number]) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.CLIENT_MATCH_TIMEOUT_MS || 5000);
+
+                try {
+                    const res = await fetch(`/api/vod/search?source=${encodeURIComponent(site.id)}&wd=${encodeURIComponent(movieName)}`, {
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (res.ok && isMounted) {
+                        const data = await res.json();
+                        if (data && data.list && data.list.length > 0) {
+                            const match = data.list.find((m: any) => m.vod_play_url && isNameMatch(m.vod_name, movieName));
+                            if (match && isMounted) {
+                                const newCandidate = {
+                                    source_id: site.id,
+                                    source_name: site.name,
+                                    vod_id: match.vod_id,
+                                    vod_play_url: match.vod_play_url,
+                                    vod_play_from: match.vod_play_from || site.name
+                                };
+
+                                pendingQueue.push(newCandidate);
+                                scheduleFlush();
+                            }
                         }
                     }
+                } catch (_) {
+                    // Ignore network timeout or abort errors
                 }
-            } catch (_) {
-                // Ignore network timeout or abort errors
-            }
-        };
+            };
 
-        const worker = async () => {
-            while (queue.length > 0 && isMounted) {
-                const site = queue.shift();
-                if (!site) break;
-                await fetchSiteCandidate(site);
-            }
-        };
+            const worker = async () => {
+                while (queue.length > 0 && isMounted) {
+                    const site = queue.shift();
+                    if (!site) break;
+                    await fetchSiteCandidate(site);
+                }
+            };
 
-        const workers = Array.from({ length: Math.min(limit, targetSites.length) }, () => worker());
+            const workers = Array.from({ length: Math.min(limit, targetSites.length) }, () => worker());
 
-        Promise.all(workers).finally(() => {
-            if (isMounted) setIsMatching(false);
-        });
+            Promise.all(workers).finally(() => {
+                if (isMounted) {
+                    if (batchTimerId) {
+                        clearTimeout(batchTimerId);
+                        batchTimerId = null;
+                    }
+                    flushCandidates();
+                    setIsMatching(false);
+                }
+            });
+        }, 1800);
 
         return () => {
             isMounted = false;
+            if (startTimeoutId) clearTimeout(startTimeoutId);
+            if (batchTimerId) clearTimeout(batchTimerId);
         };
     }, [movieName, initialSourceId]);
 
@@ -304,9 +353,7 @@ export default function ClientPlayerWrapper({
                         hasNextEpisode={hasNext}
                         nextEpisodeUrl={hasNext ? episodes[currentEpIndex + 1].url : undefined}
                         initialSeekTime={pendingSeekTime}
-                        onTimeUpdate={(c, _d, p) => {
-                            playbackStateRef.current = { currentTime: c, isPlaying: p };
-                        }}
+                        onTimeUpdate={handleTimeUpdate}
                     />
                 ) : (
                     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/5">

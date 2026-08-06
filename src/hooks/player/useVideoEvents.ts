@@ -41,6 +41,13 @@ export function useVideoEvents({
         onTimeUpdateRef.current = onTimeUpdate;
     }, [onTimeUpdate]);
 
+    const lastSavedTimeRef = useRef(0);
+
+    // Reset lastSavedTimeRef on url change
+    useEffect(() => {
+        lastSavedTimeRef.current = 0;
+    }, [url]);
+
     // Stable ref for nextEpisodeUrl to avoid stale closure in event listeners
     const nextEpisodeUrlRef = useRef(nextEpisodeUrl);
 
@@ -127,10 +134,13 @@ export function useVideoEvents({
                     onTimeUpdateRef.current(video.currentTime, video.duration, !video.paused);
                 }
 
-                // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，避免记录片头片尾的无效位置）到 localStorage
+                // 自动保存播放进度（仅在大于 5s 且距离结束大于 5s 时记录，每 3 秒最多写入一次磁盘，防范 micro-jank）
                 if (video.currentTime > 5 && video.currentTime < video.duration - 5) {
-                    const key = getProgressKey(url);
-                    localStorage.setItem(key, video.currentTime.toString());
+                    if (Math.abs(video.currentTime - lastSavedTimeRef.current) >= 3) {
+                        lastSavedTimeRef.current = video.currentTime;
+                        const key = getProgressKey(url);
+                        localStorage.setItem(key, video.currentTime.toString());
+                    }
                 }
 
                 // Next Episode preload at 60% progress

@@ -246,15 +246,15 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                             onClick={() => {
                                 const video = player.videoRef?.current || null;
                                 const container = player.containerRef?.current || null;
-                                const scale = computeFitHeightScale(video, container);
 
-                                if (scale === null) {
+                                if (!container) {
                                     player.showToast?.('暂时无法计算画面尺寸，请待视频加载后再试');
                                     return;
                                 }
 
-                                // 针对移动端元数据尚未完成载入的场景，监听 loadedmetadata 事件在元数据就绪后精确重算并应用
+                                // 若元数据尚未载入，只注册一次性 loadedmetadata 监听在就绪后算并应用，不预先应用 16:9 防止二次跳动
                                 if (video && (video.readyState < 1 || !video.videoWidth || !video.videoHeight)) {
+                                    player.showToast?.('将在视频就绪后自动适配高度');
                                     const onLoadedMetadata = () => {
                                         const newScale = computeFitHeightScale(video, container);
                                         if (newScale !== null) {
@@ -263,6 +263,13 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                                         video.removeEventListener('loadedmetadata', onLoadedMetadata);
                                     };
                                     video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+                                    return;
+                                }
+
+                                const scale = computeFitHeightScale(video, container);
+                                if (scale === null) {
+                                    player.showToast?.('暂时无法计算画面尺寸，请待视频加载后再试');
+                                    return;
                                 }
 
                                 if (Math.abs(scale - videoScale) < 0.01) {
