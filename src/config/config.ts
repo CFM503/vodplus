@@ -33,6 +33,10 @@ export const CONFIG = {
     MATCH_SOURCE_TIMEOUT: 3500,
     // 竞速匹配总超时上限 (毫秒)，到期即收工返回已有候选，防范全源挂起 SSR 渲染
     MATCH_TOTAL_TIMEOUT: 5500,
+    // 客户端跨源线路由浏览器发起分散请求的并发限制 (默认: 5)
+    CLIENT_MATCH_CONCURRENCY: 5,
+    // 客户端单个源搜索请求超时时间 (毫秒, 默认: 5000)
+    CLIENT_MATCH_TIMEOUT_MS: 5000,
     // 是否开启去除括号副标题的二次匹配 (如：长安十二时辰(粤语) 与 长安十二时辰)
     MATCH_CLEAN_TITLE: true,
 

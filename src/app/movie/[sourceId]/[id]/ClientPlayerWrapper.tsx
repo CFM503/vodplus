@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { PlayCircle, Loader2 } from 'lucide-react';
 import { Episode, Movie, PlayGroup } from '@/types';
 import { parseVodPlayUrl, parseVodPlayGroups } from '@/lib/vodParser';
+import { RESOURCE_SITES } from '@/lib/resources';
+import { isNameMatch } from '@/lib/services/vodService';
+import { CONFIG } from '@/config/config';
 
 const VideoPlayer = dynamic(
   () => import('@/components/VideoPlayer').then((mod) => mod.default),
@@ -30,7 +33,8 @@ export default function ClientPlayerWrapper({
     initialSourceId = '',
     initialSourceName = '',
     vodPlayUrl = '',
-    vodPlayFrom = ''
+    vodPlayFrom = '',
+    movieName = ''
 }: {
     episodes: Episode[];
     poster: string;
@@ -39,15 +43,84 @@ export default function ClientPlayerWrapper({
     initialSourceName?: string;
     vodPlayUrl?: string | null;
     vodPlayFrom?: string | null;
+    movieName?: string;
 }) {
     const [episodes, setEpisodes] = useState(initialEpisodes);
     const [currentSourceId, setCurrentSourceId] = useState(() => `${initialSourceId}-group-0`);
     const [currentEpIndex, setCurrentEpIndex] = useState(0);
+    const [clientCandidates, setClientCandidates] = useState<NonNullable<Movie['candidates']>>(candidates || []);
+    const [isMatching, setIsMatching] = useState(false);
     const gridRef = useRef<HTMLDivElement>(null);
 
     const currentEp = episodes[currentEpIndex];
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
+
+    // Asynchronous client-side cross-source search (fan-out pattern)
+    useEffect(() => {
+        if (!movieName) return;
+
+        let isMounted = true;
+        const targetSites = RESOURCE_SITES.filter(s => s.id !== initialSourceId);
+        if (targetSites.length === 0) return;
+
+        setIsMatching(true);
+        const limit = CONFIG.CLIENT_MATCH_CONCURRENCY || 5;
+        const queue = [...targetSites];
+
+        const fetchSiteCandidate = async (site: typeof RESOURCE_SITES[number]) => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.CLIENT_MATCH_TIMEOUT_MS || 5000);
+
+            try {
+                const res = await fetch(`/api/vod/search?source=${encodeURIComponent(site.id)}&wd=${encodeURIComponent(movieName)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (res.ok && isMounted) {
+                    const data = await res.json();
+                    if (data && data.list && data.list.length > 0) {
+                        const match = data.list.find((m: any) => m.vod_play_url && isNameMatch(m.vod_name, movieName));
+                        if (match && isMounted) {
+                            const newCandidate = {
+                                source_id: site.id,
+                                source_name: site.name,
+                                vod_id: match.vod_id,
+                                vod_play_url: match.vod_play_url,
+                                vod_play_from: match.vod_play_from || site.name
+                            };
+
+                            setClientCandidates(prev => {
+                                if (prev.some(c => c.source_id === site.id)) return prev;
+                                return [...prev, newCandidate];
+                            });
+                        }
+                    }
+                }
+            } catch (_) {
+                // Ignore network timeout or abort errors
+            }
+        };
+
+        const worker = async () => {
+            while (queue.length > 0 && isMounted) {
+                const site = queue.shift();
+                if (!site) break;
+                await fetchSiteCandidate(site);
+            }
+        };
+
+        const workers = Array.from({ length: Math.min(limit, targetSites.length) }, () => worker());
+
+        Promise.all(workers).finally(() => {
+            if (isMounted) setIsMatching(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [movieName, initialSourceId]);
 
     // Clean initial source name if it contains $$$ separators
     const cleanInitialSourceName = useMemo(() => {
@@ -58,7 +131,7 @@ export default function ClientPlayerWrapper({
         return initialSourceName.trim();
     }, [initialSourceName]);
 
-    // Expand current and candidate lines into multi-line play groups
+    // Expand current and client candidate lines into multi-line play groups
     const allLines = useMemo(() => {
         const lines: { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }[] = [];
 
@@ -75,8 +148,8 @@ export default function ClientPlayerWrapper({
         });
 
         // 2. Expand candidate groups
-        if (candidates && candidates.length > 0) {
-            candidates.forEach((c) => {
+        if (clientCandidates && clientCandidates.length > 0) {
+            clientCandidates.forEach((c) => {
                 if (c.source_id === initialSourceId) return;
 
                 const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from);
@@ -94,7 +167,7 @@ export default function ClientPlayerWrapper({
         }
 
         return lines;
-    }, [candidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom]);
+    }, [clientCandidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom]);
 
     const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
         if (line.source_id === currentSourceId) return;
@@ -214,8 +287,14 @@ export default function ClientPlayerWrapper({
                     <div className="flex items-center justify-between">
                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
                             线路选择
-                            <span className="text-[10px] font-normal text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                            <span className="text-[10px] font-normal text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800 flex items-center gap-1.5">
                                 可用 {allLines.length} 个源
+                                {isMatching && (
+                                    <span className="text-indigo-400 flex items-center gap-1">
+                                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                        检索中...
+                                    </span>
+                                )}
                             </span>
                         </h3>
                     </div>

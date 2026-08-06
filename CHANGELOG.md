@@ -1,3 +1,13 @@
+# VODplus v0.9.18 - Client-Side Distributed Cross-Source Line Matching Architecture
+
+## Features & Optimizations
+- **Browser Fan-Out Architecture**: Refactored cross-source candidate searching from Cloudflare Edge Server SSR to asynchronous client-side browser fan-out requests. SSR now serves only the primary requested video source for instant TTFB (~100-200ms) and zero outbound race bottlenecks.
+- **Asynchronous Worker Queue**: Implemented background worker queue in `ClientPlayerWrapper.tsx` that queries `/api/vod/search?source={id}&wd={name}` across active resource sites with concurrency limit (`CLIENT_MATCH_CONCURRENCY`: 5) and AbortController timeout (`CLIENT_MATCH_TIMEOUT_MS`: 5000ms).
+- **Streaming Line Selector UI**: Candidates populate into `clientCandidates` in real-time as each source completes, streaming new lines directly into the line switcher without interrupting active video playback.
+- **Cache Tag Upgrade**: Upgraded `unstable_cache` key tag to `movie-detail-v4`.
+
+---
+
 # VODplus v0.9.17 - Cross-Source Candidate Collection Alignment
 
 ## Features & Optimizations

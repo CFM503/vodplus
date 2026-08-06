@@ -115,6 +115,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
                             initialSourceName={movie.vod_play_from || ''}
                             vodPlayUrl={movie.vod_play_url}
                             vodPlayFrom={movie.vod_play_from}
+                            movieName={movie.vod_name}
                         />
                     ) : (
                         <div className="aspect-video bg-slate-900 rounded-xl flex items-center justify-center border border-white/10">
