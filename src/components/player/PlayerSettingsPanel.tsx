@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, ChevronRight, ChevronLeft, Check, Settings, Gauge, ZoomIn, FastForward, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { computeFitHeightScale } from '@/lib/player-utils';
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 
 type PlayerState = ReturnType<typeof useVideoPlayer>;
@@ -243,21 +244,31 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                             label="适配高度"
                             isActive={videoScale !== 1 && ![1.25, 1.5, 1.75, 2, 2.5, 3].includes(videoScale)}
                             onClick={() => {
-                                const video = player.videoRef?.current;
-                                const container = player.containerRef?.current;
-                                if (!video || !container) return;
-                                const rect = container.getBoundingClientRect();
-                                const vw = video.videoWidth;
-                                const vh = video.videoHeight;
-                                if (!vw || !vh || !rect.height || !rect.width) return;
-                                const videoAspect = vw / vh;
-                                const containerAspect = rect.width / rect.height;
-                                if (videoAspect > containerAspect) {
-                                    const renderedH = rect.width / videoAspect;
-                                    const scale = Math.round((rect.height / renderedH) * 100) / 100;
-                                    handleScaleChange(scale);
+                                const video = player.videoRef?.current || null;
+                                const container = player.containerRef?.current || null;
+                                const scale = computeFitHeightScale(video, container);
+
+                                if (scale === null) {
+                                    player.showToast?.('暂时无法计算画面尺寸，请待视频加载后再试');
+                                    return;
+                                }
+
+                                // 针对移动端元数据尚未完成载入的场景，监听 loadedmetadata 事件在元数据就绪后精确重算并应用
+                                if (video && (video.readyState < 1 || !video.videoWidth || !video.videoHeight)) {
+                                    const onLoadedMetadata = () => {
+                                        const newScale = computeFitHeightScale(video, container);
+                                        if (newScale !== null) {
+                                            player.handleScaleChange(newScale);
+                                        }
+                                        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                                    };
+                                    video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+                                }
+
+                                if (Math.abs(scale - videoScale) < 0.01) {
+                                    player.showToast?.('已是适配高度');
                                 } else {
-                                    handleScaleChange(1);
+                                    handleScaleChange(scale);
                                 }
                             }}
                         />

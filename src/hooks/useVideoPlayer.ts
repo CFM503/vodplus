@@ -454,5 +454,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         handleTouchEnd: handleTouchEndWired,
         formatTime,
         showGestureHUD: gestures.showGestureHUD,
+        showToast,
     };
 }

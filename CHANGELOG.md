@@ -1,3 +1,12 @@
+# VODplus v0.9.20 - Mobile Video Fit Height Scale Calculation & Toast Fix
+
+## Features & Optimizations
+- **Mobile Fit Height Helper**: Introduced `computeFitHeightScale(video, container)` in `src/lib/player-utils.ts` with a two-tier fallback (`clientWidth/clientHeight` -> `16:9` ratio fallback) to calculate container height scaling when `videoWidth`/`videoHeight` is uninitialized or 0 on mobile browsers.
+- **Robust Metadata Event Listener**: Added a one-time `loadedmetadata` listener on video elements when `readyState < 1`, ensuring precise scale recalculation as soon as stream metadata loads.
+- **Toast Feedback Integration**: Exported `showToast` from `useVideoPlayer` to provide clear user feedback ("已是适配高度", "已适配高度 (1.xx)", or "暂时无法计算画面尺寸，请待视频加载后再试") and eliminated silent returns.
+
+---
+
 # VODplus v0.9.19 - Seamless Line Switch Playback Progress Recovery
 
 ## Features & Optimizations
