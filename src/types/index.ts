@@ -36,3 +36,10 @@ export interface Episode {
     name: string;
     url: string;
 }
+
+export interface PlayGroup {
+    id: string;
+    name: string;
+    playUrl: string;
+    episodes: Episode[];
+}

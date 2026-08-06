@@ -1,3 +1,12 @@
+# VODplus v0.9.15 - Advanced Line Switching & Cross-Source Matching
+
+## Features & Optimizations
+- **Intra-Source $$$ Group Parsing**: Added `PlayGroup` type interface and implemented `parseVodPlayGroups` to split complex playlists separated by `$$$` under a single source. These are presented in the "Line Selection" bar as individual lines (e.g. `量子资源 · 线路1`).
+- **Non-TMDB Cross-Source Matching**: Enabled background cross-source search and candidates retrieval on non-TMDB pages (e.g. `/movie/feifan/xxx`). The requested primary source plays first by default, and other matched sources are listed as alternatives in the line switcher.
+- **Fail-safe Error Alerts**: Implemented user-facing error indicators in case a switched playlist fails parsing to prevent silent failures.
+
+---
+
 # VODplus v0.9.14 - Client-side Multi-Line Source Switching
 
 ## Features & Optimizations

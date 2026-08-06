@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { PlayCircle, Loader2 } from 'lucide-react';
-import { Episode, Movie } from '@/types';
-import { parseVodPlayUrl } from '@/lib/vodParser';
+import { Episode, Movie, PlayGroup } from '@/types';
+import { parseVodPlayUrl, parseVodPlayGroups } from '@/lib/vodParser';
 
 const VideoPlayer = dynamic(
   () => import('@/components/VideoPlayer').then((mod) => mod.default),
@@ -28,16 +28,20 @@ export default function ClientPlayerWrapper({
     poster,
     candidates = [],
     initialSourceId = '',
-    initialSourceName = ''
+    initialSourceName = '',
+    vodPlayUrl = '',
+    vodPlayFrom = ''
 }: {
     episodes: Episode[];
     poster: string;
     candidates?: NonNullable<Movie['candidates']>;
     initialSourceId?: string;
     initialSourceName?: string;
+    vodPlayUrl?: string | null;
+    vodPlayFrom?: string | null;
 }) {
     const [episodes, setEpisodes] = useState(initialEpisodes);
-    const [currentSourceId, setCurrentSourceId] = useState(initialSourceId);
+    const [currentSourceId, setCurrentSourceId] = useState(() => `${initialSourceId}-group-0`);
     const [currentEpIndex, setCurrentEpIndex] = useState(0);
     const gridRef = useRef<HTMLDivElement>(null);
 
@@ -45,33 +49,49 @@ export default function ClientPlayerWrapper({
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
 
-    // Filter or append the current source to candidates if missing
+    // Expand current and candidate lines into multi-line play groups
     const allLines = useMemo(() => {
-        if (!candidates || candidates.length === 0) {
-            return [];
-        }
-        const hasCurrent = candidates.some(c => c.source_id === initialSourceId);
-        if (!hasCurrent && initialEpisodes.length > 0) {
-            const serializedPlayUrl = initialEpisodes.map(ep => `${ep.name}$${ep.url}`).join('#');
-            return [
-                {
-                    source_id: initialSourceId,
-                    source_name: initialSourceName || '默认线路',
-                    vod_id: '',
-                    vod_play_url: serializedPlayUrl,
-                    vod_play_from: initialSourceName || '默认线路'
-                },
-                ...candidates
-            ];
-        }
-        return candidates;
-    }, [candidates, initialSourceId, initialSourceName, initialEpisodes]);
+        const lines: { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }[] = [];
 
-    const handleSwitchSource = useCallback((line: NonNullable<Movie['candidates']>[number]) => {
+        // 1. Expand current source groups
+        const currentGroups = parseVodPlayGroups(vodPlayUrl, vodPlayFrom);
+        currentGroups.forEach((g, idx) => {
+            lines.push({
+                source_id: `${initialSourceId}-group-${idx}`,
+                source_name: `${initialSourceName}${currentGroups.length > 1 ? ' · ' + g.name : ''}`,
+                vod_id: '',
+                vod_play_url: g.playUrl,
+                vod_play_from: initialSourceName
+            });
+        });
+
+        // 2. Expand candidate groups
+        if (candidates && candidates.length > 0) {
+            candidates.forEach((c) => {
+                if (c.source_id === initialSourceId) return;
+
+                const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from);
+                cGroups.forEach((g, idx) => {
+                    lines.push({
+                        source_id: `${c.source_id}-group-${idx}`,
+                        source_name: `${c.source_name}${cGroups.length > 1 ? ' · ' + g.name : ''}`,
+                        vod_id: c.vod_id,
+                        vod_play_url: g.playUrl,
+                        vod_play_from: c.vod_play_from || c.source_name
+                    });
+                });
+            });
+        }
+
+        return lines;
+    }, [candidates, initialSourceId, initialSourceName, vodPlayUrl, vodPlayFrom]);
+
+    const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
         if (line.source_id === currentSourceId) return;
 
         const nextEpisodes = parseVodPlayUrl(line.vod_play_url);
         if (!nextEpisodes || nextEpisodes.length === 0) {
+            alert('该线路暂无有效剧集');
             return;
         }
 

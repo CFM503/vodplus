@@ -143,7 +143,28 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
     const source = RESOURCE_SITES.find(s => s.id === sourceId);
     if (!source) return null;
     const res = await fetchFromSource(source, `${source.detailPath}${id}`);
-    return res.list[0] || null;
+    const movie = res.list[0] || null;
+
+    if (movie && movie.vod_name) {
+        try {
+            // Non-TMDB page cross-source matching for line switching
+            const matchResult = await performRaceMatch(movie.vod_name, disabledSources);
+            return {
+                ...movie,
+                candidates: matchResult.candidates.map(c => ({
+                    source_id: c.source.id,
+                    source_name: c.source.name,
+                    vod_id: c.match.vod_id,
+                    vod_play_url: c.match.vod_play_url,
+                    vod_play_from: c.match.vod_play_from || c.source.name,
+                })),
+            };
+        } catch (e) {
+            logger.error('vodService', `Failed to match cross-source for ${movie.vod_name}:`, e);
+        }
+    }
+
+    return movie;
 }
 
 const internalCachedGetMovieDetail = unstable_cache(
