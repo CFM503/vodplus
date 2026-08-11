@@ -33,6 +33,8 @@ export function useVideoGestures({
         vol: number; brightness: number; currentTime: number;
     } | null>(null);
     const gestureTypeRef = useRef<'none' | 'vertical-left' | 'vertical-right' | 'horizontal'>('none');
+    // 本次触摸是否已识别为手势（亮度/音量拖拽等），用于手势结束后避免误触发控制栏单击开关
+    const gestureActiveRef = useRef(false);
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const lastMousePosRef = useRef({ x: 0, y: 0 });
     const gestureHUDTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,6 +77,7 @@ export function useVideoGestures({
             currentTime: videoRef.current?.currentTime || 0,
         };
         gestureTypeRef.current = 'none';
+        gestureActiveRef.current = false;
 
         // Long press speed logic (right 25% zone)
         if (containerRef.current) {
@@ -108,6 +111,7 @@ export function useVideoGestures({
 
             const isLeft = touchStartRef.current.x < containerRect.left + containerRect.width * 0.5;
             gestureTypeRef.current = isLeft ? 'vertical-left' : 'vertical-right';
+            gestureActiveRef.current = true;
         }
 
         // Execute gesture - 优化：添加阈值检查，减少不必要的更新
@@ -130,7 +134,7 @@ export function useVideoGestures({
         }
     }, [isEmbed, isSpeedHolding, containerRef, handleVolumeChange, showGestureHUD, brightness, volume]);
 
-    const handleTouchEnd = useCallback((e: React.TouchEvent): boolean => {
+    const handleTouchEnd = useCallback((e: React.TouchEvent): { isTap: boolean; wasGesture: boolean } => {
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
@@ -140,10 +144,11 @@ export function useVideoGestures({
             handleSpeedHoldEnd();
             touchStartRef.current = null;
             gestureTypeRef.current = 'none';
-            return false;
+            gestureActiveRef.current = false;
+            return { isTap: false, wasGesture: true };
         }
 
-        if (!touchStartRef.current) return false;
+        if (!touchStartRef.current) return { isTap: false, wasGesture: false };
 
         const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
         const touchDuration = Date.now() - touchStartRef.current.time;
@@ -153,11 +158,29 @@ export function useVideoGestures({
             && touchDuration < CONFIG.TAP_MAX_DURATION
             && Math.abs(deltaX) < CONFIG.TAP_MAX_MOVEMENT;
 
+        const wasGesture = gestureActiveRef.current;
+
         hideGestureHUD();
         touchStartRef.current = null;
         gestureTypeRef.current = 'none';
+        gestureActiveRef.current = false;
 
-        return isTap;
+        return { isTap, wasGesture };
+    }, [isSpeedHolding, handleSpeedHoldEnd, hideGestureHUD]);
+
+    // 触摸被系统打断（如浏览器接管滚动、来电等）时的清理：重置手势状态，避免残留影响下一次触摸
+    const handleTouchCancel = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        if (isSpeedHolding) {
+            handleSpeedHoldEnd();
+        }
+        hideGestureHUD();
+        touchStartRef.current = null;
+        gestureTypeRef.current = 'none';
+        gestureActiveRef.current = false;
     }, [isSpeedHolding, handleSpeedHoldEnd, hideGestureHUD]);
 
     // 长按加速时显示/隐藏 HUD
@@ -180,5 +203,6 @@ export function useVideoGestures({
         handleTouchStart,
         handleTouchMove,
         handleTouchEnd,
+        handleTouchCancel,
     };
 }

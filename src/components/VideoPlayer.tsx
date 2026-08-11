@@ -47,7 +47,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleMouseMove, handleTouchStart, handleTouchMove,
-        handleTouchEnd, isEmbed, brightness, gestureHUD, toast, videoScale,
+        handleTouchEnd, handleTouchCancel, isEmbed, brightness, gestureHUD, toast, videoScale,
         isMuted, togglePlay, showSettings, setShowSettings,
         toggleFullscreen, handleSeekRelative,
     } = player;
@@ -177,6 +177,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
             onTouchStart={handleContainerTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleContainerTouchEnd}
+            onTouchCancel={handleTouchCancel}
             onClick={handlePCVideoClick}
             onDoubleClick={handlePCVideoDoubleClick}
         >
@@ -189,7 +190,10 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                 preload="auto"
                 crossOrigin="anonymous"
                 muted={isMuted}
-                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center' }}
+                // touchAction: 'none' 是移动端亮度/音量手势的关键：
+                // 不设置的话，浏览器会把垂直拖动当作页面滚动并触发 touchcancel，
+                // 手势在达到 GESTURE_VERTICAL_THRESHOLD 之前就会被系统打断（进度条正是靠 touchAction none 才能拖动）
+                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center', touchAction: 'none' }}
             />
 
             {/* Loading Spinner - z-30 */}

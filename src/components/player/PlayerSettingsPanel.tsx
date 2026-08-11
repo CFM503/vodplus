@@ -252,17 +252,24 @@ export default function PlayerSettingsPanel({ player, onClose, className }: Play
                                     return;
                                 }
 
-                                // 若元数据尚未载入，只注册一次性 loadedmetadata 监听在就绪后算并应用，不预先应用 16:9 防止二次跳动
+                                // 若元数据尚未载入：同时监听 loadedmetadata / loadeddata / canplay，任一就绪即重算并应用。
+                                // 移动端 HLS (MSE) 存在 loadedmetadata 已触发但 videoWidth 仍为 0 的时序窗口，
+                                // 只监听 loadedmetadata 会导致监听器永不再次触发（静默失败），故用多事件 + 就绪检查兜底
                                 if (video && (video.readyState < 1 || !video.videoWidth || !video.videoHeight)) {
                                     player.showToast?.('将在视频就绪后自动适配高度');
-                                    const onLoadedMetadata = () => {
+                                    const applyWhenReady = () => {
+                                        if (!video.videoWidth || !video.videoHeight) return; // 尚未就绪，等待下一次就绪事件
                                         const newScale = computeFitHeightScale(video, container);
                                         if (newScale !== null) {
                                             player.handleScaleChange(newScale);
                                         }
-                                        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                                        video.removeEventListener('loadedmetadata', applyWhenReady);
+                                        video.removeEventListener('loadeddata', applyWhenReady);
+                                        video.removeEventListener('canplay', applyWhenReady);
                                     };
-                                    video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+                                    video.addEventListener('loadedmetadata', applyWhenReady);
+                                    video.addEventListener('loadeddata', applyWhenReady);
+                                    video.addEventListener('canplay', applyWhenReady);
                                     return;
                                 }
 

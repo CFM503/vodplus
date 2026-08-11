@@ -1,3 +1,12 @@
+# VODplus v0.9.22 - Mobile Gesture Brightness & Fit Height Reliability Fix
+
+## Bug Fixes
+- **Mobile Brightness/Volume Gesture Fix**: Added `touch-action: none` to the video element so vertical drags no longer get hijacked by page scrolling on mobile (the play page is scrollable, and passive `touchmove` listeners cannot `preventDefault`). The brightness/volume gesture now reliably reaches its activation threshold instead of being interrupted by `touchcancel`. Added an `onTouchCancel` cleanup handler to reset gesture state when the browser interrupts a touch (incoming call, notification shade, etc.), preventing stale state from leaking into the next touch.
+- **Controls Flash After Gesture Fix**: The mobile single-tap controls toggle is now skipped when the finished touch was a drag gesture (brightness/volume/long-press speed). Previously every gesture ended by flashing the control bar on/off 300ms later.
+- **Mobile Fit Height Silent-Failure Fix**: The "适配高度" button now listens to `loadedmetadata` / `loadeddata` / `canplay` with a readiness re-check instead of a one-time `loadedmetadata` listener. On mobile HLS (MSE) there is a timing window where `loadedmetadata` fires while `videoWidth` is still 0, which made the old one-time listener never fire again (silent failure after the "将在视频就绪后自动适配高度" toast).
+
+---
+
 # VODplus v0.9.21 - Play Page Anti-Stutter & Frame-Drop Performance Optimization
 
 ## Features & Optimizations

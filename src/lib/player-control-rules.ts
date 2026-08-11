@@ -74,7 +74,8 @@ export interface PlayerControlActions {
     handleMouseMove?: (e: React.MouseEvent) => void;
     handleTouchStart?: (e: React.TouchEvent) => void;
     handleTouchMove?: (e: React.TouchEvent) => void;
-    handleTouchEnd?: (e: React.TouchEvent) => void;
+    // 返回 true 表示本次触摸是拖拽手势（亮度/音量/长按等），不应触发控制栏单击开关
+    handleTouchEnd?: (e: React.TouchEvent) => boolean | void;
 }
 
 // ===========================
@@ -351,16 +352,17 @@ export function useMobileVideoTouch(
         // 记录本次触摸结束时间，供下次双击检测使用
         refs.lastTapRef.current = now;
 
-        if (!isDoubleTap && !stateRef.current.showSettings) {
+        // 先交由手势处理器判定本次触摸是否为拖拽手势（亮度/音量/长按倍速）。
+        // 拖拽手势结束后不应触发控制栏的单击开关逻辑，否则调亮度/音量后控制栏会闪烁
+        const wasGesture = !!actionsRef.current.handleTouchEnd?.(e);
+
+        if (!isDoubleTap && !stateRef.current.showSettings && !wasGesture) {
             // Delayed single-tap: toggle controls visibility (not play/pause)
             pendingTimerRef.current = setTimeout(() => {
                 // 使用函数式更新避免闭包中 isHovering 过期
                 actionsRef.current.setIsHovering(prev => !prev);
             }, PLAYER_CONTROL_CONFIG.DOUBLE_TAP_DELAY);
         }
-
-        // Forward to gesture handler for long-press cleanup and gesture state reset.
-        actionsRef.current.handleTouchEnd?.(e);
     }, []); // stable
 
     // Cleanup

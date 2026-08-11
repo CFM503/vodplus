@@ -361,17 +361,20 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     }, [url, hlsSource.isLoading, showToast]);
 
     // Wiring: touch end → gesture cleanup (tap handling delegated to useMobileVideoTouch in VideoPlayer.tsx)
-    const handleTouchEndWired = useCallback((e: React.TouchEvent) => {
-        const wasTap = gestures.handleTouchEnd(e);
-        if (wasTap) {
+    // 返回值 wasGesture=true 表示本次触摸是亮度/音量拖拽或长按倍速等手势，
+    // 供 useMobileVideoTouch 决定是否跳过控制栏单击开关逻辑
+    const handleTouchEndWired = useCallback((e: React.TouchEvent): boolean => {
+        const { isTap, wasGesture } = gestures.handleTouchEnd(e);
+        if (isTap) {
             if (e.cancelable) e.preventDefault();
             // Mobile tap handling (controls toggle / double-tap) is delegated to
             // useMobileVideoTouch in VideoPlayer.tsx for YouTube-style behavior.
             // Do NOT call controls.handleVideoClick here.
         }
-        if (!wasTap) {
+        if (!isTap) {
             controls.setIsHovering(true);
         }
+        return wasGesture;
     }, [gestures.handleTouchEnd, controls.setIsHovering]);
 
     // Wiring: mouse move → show controls (skip when settings open to prevent flicker)
@@ -452,6 +455,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         handleTouchStart: gestures.handleTouchStart,
         handleTouchMove: gestures.handleTouchMove,
         handleTouchEnd: handleTouchEndWired,
+        handleTouchCancel: gestures.handleTouchCancel,
         formatTime,
         showGestureHUD: gestures.showGestureHUD,
         showToast,
