@@ -1,3 +1,12 @@
+# VODplus v0.9.33 - SeaCMS XML 采集协议支持
+
+## Features & Optimizations
+- **SeaCMS / MacCMS XML 采集协议支持**: The fetcher now understands both MacCMS JSON and the SeaCMS/MacCMS XML collection protocol (RSS 5.1). Any source that answers with XML (`<?xml` / `<rss>`) — previously rejected as "Non-JSON response" — is parsed into the same internal structure as JSON, so search, detail pages, library feeds, playback line parsing, and line switching all work with zero downstream changes. This is a generic format-compat feature: every MacCMS/SeaCMS station (JSON *or* XML) is now usable as a custom source without code changes.
+- **XML 图片地址强制净化 (安全)**: The reference XML station used for real-data testing turned out to be a compromised SeaCMS installation — its `<pic>` field carried an injected PHP backdoor template (`#{if:1)@eval(pack('H*',...));//}{end if}`) plus an XSS payload (`onerror=jQuery.getScript(...)`), observed in both payload-before-URL and payload-after-URL forms. The new parser sanitizes every picture URL before it reaches any UI or image proxy: it keeps only the part before the first `#` and requires a clean `http(s)` URL with no quotes/spaces/angle brackets — anything else is dropped (placeholder image). Backdoor/XSS payloads therefore never survive into the page, regardless of injection position.
+- **XML 解析细节**: regex-based, zero new dependencies (Edge Runtime has no DOMParser); supports CDATA and plain-text fields, HTML entity decoding, multi-line (`<dd flag="线路名">`) play sources joined with `$$$` exactly like MacCMS JSON, and pagination attributes (`page`/`pagecount`/`pagesize`/`recordcount`).
+
+---
+
 # VODplus v0.9.32 - Custom Sources in Library Page
 
 ## Bug Fixes

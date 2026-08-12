@@ -3,6 +3,7 @@ import { ApiResponse } from '@/types';
 import { ResourceSite } from '../resources';
 import { CONFIG } from '@/config/config';
 import { logger } from '../logger';
+import { parseSeaCmsXml } from './seaCmsXml';
 
 export async function fetchRawFromSource(source: ResourceSite, params: string = '', noStore = false, timeoutOverride?: number): Promise<unknown> {
     const url = `${source.baseUrl}${params}`;
@@ -17,13 +18,27 @@ export async function fetchRawFromSource(source: ResourceSite, params: string = 
         const res = await fetchWithTimeout(url, timeout, cacheOptions);
         const text = await res.text();
 
-        // Only support JSON responses for Edge Runtime compatibility
-        if (!text.trim().startsWith('{')) {
-            logger.warn('Fetcher', `Non-JSON response from ${source.name}, skipping`);
+        // 支持两类响应：
+        // 1) MacCMS JSON（以 { 开头）
+        // 2) SeaCMS/MacCMS XML 采集协议 RSS 5.1（以 < 开头，如 <?xml / <rss），
+        //    解析结果与 JSON 同构，下游 normalizer 无需感知差异
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{')) {
+            return JSON.parse(text);
+        }
+        if (trimmed.startsWith('<')) {
+            const parsed = parseSeaCmsXml(text);
+            if (parsed) {
+                const count = (parsed as any)?.list?.length ?? 0;
+                logger.info('Fetcher', `SeaCMS XML response from ${source.name}, ${count} items`);
+                return parsed;
+            }
+            logger.warn('Fetcher', `Failed to parse XML response from ${source.name}, skipping`);
             return undefined;
         }
 
-        return JSON.parse(text);
+        logger.warn('Fetcher', `Non-JSON/XML response from ${source.name}, skipping`);
+        return undefined;
     } catch (error: unknown) {
         // 处理超时中止错误（AbortError），不抛出，仅警告
         if (error instanceof DOMException && error.name === 'AbortError') {
