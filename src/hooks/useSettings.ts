@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { getCookie, setCookie } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { ResourceSite } from '@/lib/resources';
+import { CUSTOM_SOURCES_COOKIE } from '@/lib/sourceConfig';
 
 interface Settings {
     disabledSources: string[];
     movieSource: string;
     tvSource: string;
     customLocalUrl: string;
+    // v0.9.31: 自定义资源站列表
+    customSources: ResourceSite[];
 }
 
 export function useSettings(isOpen: boolean) {
@@ -14,6 +18,7 @@ export function useSettings(isOpen: boolean) {
     const [movieSource, setMovieSource] = useState('tmdb');
     const [tvSource, setTvSource] = useState('tmdb');
     const [customLocalUrl, setCustomLocalUrl] = useState('');
+    const [customSources, setCustomSources] = useState<ResourceSite[]>([]);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -26,6 +31,16 @@ export function useSettings(isOpen: boolean) {
                     if (Array.isArray(parsed)) setDisabledSources(parsed);
                 } catch (e: unknown) {
                     logger.error('Settings', 'Failed to parse disabled sources', e);
+                }
+            }
+
+            const savedCustom = getCookie(CUSTOM_SOURCES_COOKIE);
+            if (savedCustom) {
+                try {
+                    const parsed = JSON.parse(savedCustom);
+                    if (Array.isArray(parsed)) setCustomSources(parsed);
+                } catch (e: unknown) {
+                    logger.error('Settings', 'Failed to parse custom sources', e);
                 }
             }
 
@@ -47,9 +62,29 @@ export function useSettings(isOpen: boolean) {
         setDisabledSources(next);
     };
 
+    // v0.9.31: 添加自定义源 (id 冲突则拒绝)
+    const addCustomSource = (source: ResourceSite): boolean => {
+        if (customSources.some(s => s.id === source.id)) return false;
+        setCustomSources(prev => [...prev, source]);
+        return true;
+    };
+
+    // v0.9.31: 删除自定义源 (同时从禁用列表移除, 防止残留)
+    const removeCustomSource = (id: string) => {
+        setCustomSources(prev => prev.filter(s => s.id !== id));
+        setDisabledSources(prev => prev.filter(s => s !== id));
+    };
+
+    // v0.9.31: 导入时整体替换自定义源
+    const importSources = (sources: ResourceSite[], disabled: string[]) => {
+        setCustomSources(sources);
+        setDisabledSources(disabled);
+    };
+
     const saveSettings = () => {
         try {
             setCookie('VOD_DISABLED_SOURCES_V2', JSON.stringify(disabledSources));
+            setCookie(CUSTOM_SOURCES_COOKIE, JSON.stringify(customSources));
             setCookie('VOD_MOVIE_SOURCE', movieSource);
             setCookie('VOD_TV_SOURCE', tvSource);
             setCookie('VOD_CUSTOM_LOCAL_URL', customLocalUrl);
@@ -66,14 +101,19 @@ export function useSettings(isOpen: boolean) {
             disabledSources,
             movieSource,
             tvSource,
-            customLocalUrl
+            customLocalUrl,
+            customSources
         },
         setters: {
             setDisabledSources,
             setMovieSource,
             setTvSource,
             setCustomLocalUrl,
-            toggleSource
+            toggleSource,
+            addCustomSource,
+            removeCustomSource,
+            importSources,
+            setCustomSources
         },
         saveSettings
     };

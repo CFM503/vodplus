@@ -32,7 +32,7 @@ export async function generateMetadata({ params, searchParams }: PageProps) {
     const cookieStore = await cookies();
     const preferences = await getUserPreferences(cookieStore);
 
-    const movie = await cachedGetMovieDetail(sourceId, id, preferences.disabledSources, name);
+    const movie = await cachedGetMovieDetail(sourceId, id, preferences.disabledSources, name, preferences.customSources);
 
     if (!movie) {
         return {
@@ -68,9 +68,9 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
     const { sourceId, id } = await params;
     const { name } = await searchParams || {};
     const cookieStore = await cookies();
-    const { disabledSources } = await getUserPreferences(cookieStore);
+    const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
-    const movie = await cachedGetMovieDetail(sourceId, id, disabledSources, name);
+    const movie = await cachedGetMovieDetail(sourceId, id, disabledSources, name, customSources);
 
     if (!movie) {
         if (name) {

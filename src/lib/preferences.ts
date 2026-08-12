@@ -1,11 +1,15 @@
 import { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 import { logger } from './logger';
+import { ResourceSite } from './resources';
+import { CUSTOM_SOURCES_COOKIE, parseCustomSources } from './sourceConfig';
 
 interface UserPreferences {
     disabledSources: string[];
     movieSource: string;
     tvSource: string;
     customLocalUrl: string;
+    // v0.9.31: 自定义资源站列表 (用户通过 设置-资源站管理 添加, 存于 Cookie)
+    customSources: ResourceSite[];
 }
 
 export async function getUserPreferences(cookieStore: ReadonlyRequestCookies): Promise<UserPreferences> {
@@ -31,10 +35,14 @@ export async function getUserPreferences(cookieStore: ReadonlyRequestCookies): P
     // 3. Get Custom URL
     const customLocalUrl = cookieStore.get('VOD_CUSTOM_LOCAL_URL')?.value || '';
 
+    // 4. Get Custom Sources (v0.9.31)
+    const customSources = parseCustomSources(cookieStore.get(CUSTOM_SOURCES_COOKIE)?.value);
+
     return {
         disabledSources,
         movieSource,
         tvSource,
-        customLocalUrl
+        customLocalUrl,
+        customSources
     };
 }

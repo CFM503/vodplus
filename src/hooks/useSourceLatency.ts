@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RESOURCE_SITES } from '@/lib/resources';
+import { readCustomSourcesFromDocument } from '@/lib/sourceConfig';
 
 interface LatencyResult {
     sourceId: string;
@@ -142,13 +143,14 @@ export function useSourceLatency(): UseSourceLatencyReturn {
         abortControllersRef.current.clear();
 
         const results = await Promise.allSettled(
-            RESOURCE_SITES.map(source => probeSource(source))
+            [...RESOURCE_SITES, ...readCustomSourcesFromDocument()].map(source => probeSource(source))
         );
 
         const newLatencies = new Map<string, LatencyResult>();
+        const sources = [...RESOURCE_SITES, ...readCustomSourcesFromDocument()];
 
         results.forEach((result, index) => {
-            const source = RESOURCE_SITES[index];
+            const source = sources[index];
             
             if (result.status === 'fulfilled') {
                 newLatencies.set(source.id, result.value);

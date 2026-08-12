@@ -19,9 +19,9 @@ export async function GET(request: NextRequest) {
 
     try {
         const cookieStore = await cookies();
-        const { disabledSources } = await getUserPreferences(cookieStore);
+        const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
-        const movie = await cachedGetMovieDetail(source, id, disabledSources, name);
+        const movie = await cachedGetMovieDetail(source, id, disabledSources, name, customSources);
         return NextResponse.json({ code: 1, msg: 'OK', data: movie });
     } catch (error) {
         logger.error('DetailAPI', 'Error fetching detail:', error);

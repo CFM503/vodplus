@@ -7,6 +7,7 @@ import { PlayCircle, Loader2 } from 'lucide-react';
 import { Episode, Movie, PlayGroup } from '@/types';
 import { parseVodPlayUrl, parseVodPlayGroups } from '@/lib/vodParser';
 import { RESOURCE_SITES } from '@/lib/resources';
+import { readCustomSourcesFromDocument } from '@/lib/sourceConfig';
 import { isNameMatch } from '@/lib/nameMatch';
 import { CONFIG } from '@/config/config';
 
@@ -76,7 +77,8 @@ export default function ClientPlayerWrapper({
         if (!movieName) return;
 
         let isMounted = true;
-        const targetSites = RESOURCE_SITES.filter(s => s.id !== initialSourceId);
+        // v0.9.31: 换源匹配包含用户自定义源 (Cookie 中的 VOD_CUSTOM_SOURCES)
+        const targetSites = [...RESOURCE_SITES, ...readCustomSourcesFromDocument()].filter(s => s.id !== initialSourceId);
         if (targetSites.length === 0) return;
 
         let startTimeoutId: NodeJS.Timeout | null = null;

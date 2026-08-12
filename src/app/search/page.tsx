@@ -19,10 +19,10 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
     // Read preferences
     const cookieStore = await cookies();
-    const { disabledSources } = await getUserPreferences(cookieStore);
+    const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
-    // Prepare active sources list for client
-    const activeSources = RESOURCE_SITES
+    // Prepare active sources list for client (内置源 + 自定义源, 去掉禁用的)
+    const activeSources = [...RESOURCE_SITES, ...customSources]
         .filter(s => !disabledSources.includes(s.id))
         .map(s => ({ id: s.id, name: s.name }));
 

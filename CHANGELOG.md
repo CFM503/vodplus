@@ -1,3 +1,13 @@
+# VODplus v0.9.31 - Source List Import/Export & Custom Sources
+
+## Features & Optimizations
+- **Source List Export**: Settings → 资源站管理 now downloads the full source configuration as a JSON file (`vodplus-sources-日期.json`) — disabled-source state plus any custom sources — for backup, device migration, or sharing.
+- **Source List Import**: Paste JSON text or pick a file to restore the source configuration. Strict validation rejects non-vodplus files, malformed JSON, and illegal entries (only `http(s)` source URLs accepted, blocking SSRF-style payloads).
+- **Custom Sources (UI-managed)**: Add your own MacCMS/SeaCMS resource stations directly in Settings — source ID, name, API base URL, region — no code changes needed. Custom sources are fully wired: they appear in the station list with a "自定义" badge, participate in detail playback, client-side line switching, full-site search, and latency probing (server routes read the `VOD_CUSTOM_SOURCES` cookie).
+- **Import/Export roundtrip**: exported files restore exactly what was exported, with duplicate IDs filtered and built-in source IDs protected from collision.
+
+---
+
 # VODplus v0.9.30 - 红牛3 Backup Line
 
 ## Features & Optimizations

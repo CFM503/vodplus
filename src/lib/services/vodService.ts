@@ -1,5 +1,6 @@
 
 import { RESOURCE_SITES, ResourceSite } from '../resources';
+import { parseCustomSources } from '../sourceConfig';
 import { ApiResponse, Movie } from '@/types';
 type MediaType = 'movie' | 'tv';
 import { getMetadataProvider } from '../metadata';
@@ -82,7 +83,7 @@ export async function getRecentMovies(sourceId: string = 'feifan', page: number 
     return fetchFromSource(source, `?ac=detail&pg=${page}&t=`, false, CONFIG.LIST_TIMEOUT || 4000);
 }
 
-export async function getMovieDetail(sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string) {
+export async function getMovieDetail(sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string, customSources?: ResourceSite[]) {
     if (sourceId === 'tmdb') {
         const provider = getMetadataProvider(sourceId);
         const detailId = id.replace(`${sourceId}-`, '');
@@ -140,25 +141,29 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
         return null;
     }
 
-    const source = RESOURCE_SITES.find(s => s.id === sourceId);
+    // v0.9.31: 优先内置源, 否则查找用户自定义源
+    const source = RESOURCE_SITES.find(s => s.id === sourceId) || customSources?.find(s => s.id === sourceId);
     if (!source) return null;
     const res = await fetchFromSource(source, `${source.detailPath}${id}`);
     return res.list[0] || null;
 }
 
 const internalCachedGetMovieDetail = unstable_cache(
-    async (sourceId: string, id: string, disabledSourcesKey: string, nameHint?: string) => {
+    async (sourceId: string, id: string, disabledSourcesKey: string, nameHint?: string, customSourcesKey?: string) => {
         const disabledSources = disabledSourcesKey ? disabledSourcesKey.split(',') : [];
-        return getMovieDetail(sourceId, id, disabledSources, nameHint);
+        const customSources = customSourcesKey ? parseCustomSources(customSourcesKey) : [];
+        return getMovieDetail(sourceId, id, disabledSources, nameHint, customSources);
     },
     ['movie-detail-v4'],
     { revalidate: CONFIG.DETAIL_REVALIDATE_SECONDS || 43200 }
 );
 
 // React.cache ensures per-request deduplication (e.g. generateMetadata + MovieDetail page component)
-export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string) => {
+export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, disabledSources: string[] = [], nameHint?: string, customSources?: ResourceSite[]) => {
     const disabledSourcesKey = (disabledSources || []).slice().sort().join(',');
-    return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey, nameHint);
+    // 自定义源序列化后参与缓存键, 保证自定义源配置变化时缓存失效
+    const customSourcesKey = customSources && customSources.length > 0 ? JSON.stringify(customSources) : '';
+    return internalCachedGetMovieDetail(sourceId, id, disabledSourcesKey, nameHint, customSourcesKey);
 });
 
 import { isNameMatch } from '@/lib/nameMatch';
