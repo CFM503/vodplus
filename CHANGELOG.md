@@ -1,3 +1,12 @@
+# VODplus v0.9.24 - Domestic-CDN Resource Station, Slow-Line Cleanup & Build Fix
+
+## Features & Optimizations
+- **360资源站 Added (Domestic CDN)**: Added 360资源 (`360zy.com`) - video segments served from mainland China nodes (Hefei Telecom / Harbin Unicom), measured ~700 KB/s from CN network (fastest domestic line), CORS allows `vodplus.pages.dev`. Covers popular new titles (e.g. 狂飙) though not 长安十二时辰.
+- **Slow US-Phoenix Lines Removed**: Removed 3 resource stations whose CDN segments are on US-Phoenix (Input Output Flood AS53755) and measured only 49~59 KB/s from CN: 飘零资源 (`p2100.net`), 艾旦资源 (`lovedan.net`), 最大资源 (`zuidazy.me`). They were slower than even the default 量子 line, so keeping them only cluttered the line switcher.
+- **package.json BOM Fix**: Removed a UTF-8 Byte-Order-Mark accidentally introduced in `package.json` during v0.9.23 release, which broke `next build` JSON parsing (and thus Cloudflare Pages deployment).
+
+---
+
 # VODplus v0.9.23 - More Resource Stations for Playback Lines
 
 ## Features & Optimizations

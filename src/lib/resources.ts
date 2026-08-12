@@ -98,26 +98,13 @@ export const RESOURCE_SITES: ResourceSite[] = [
         detailPath: '?ac=detail&ids=',
         headers: {},
     },
+    // ============ v3: 亚洲/国内节点资源站 (2026-08 实测) ============
+    // 360资源: 分片节点在国内 (合肥电信/哈尔滨联通), 实测 ~700KB/s, 国内最快的通用线路
+    // 注意: 未收录《长安十二时辰》, 但有大量热门新片 (如《狂飙》)
     {
-        id: 'piaoling',
-        name: '飘零资源',
-        baseUrl: 'https://p2100.net/api.php/provide/vod/',
-        searchPath: '?ac=detail&wd=',
-        detailPath: '?ac=detail&ids=',
-        headers: {},
-    },
-    {
-        id: 'aidan',
-        name: '艾旦资源',
-        baseUrl: 'https://lovedan.net/api.php/provide/vod',
-        searchPath: '?ac=detail&wd=',
-        detailPath: '?ac=detail&ids=',
-        headers: {},
-    },
-    {
-        id: 'zuida',
-        name: '最大资源',
-        baseUrl: 'http://zuidazy.me/api.php/provide/vod/',
+        id: '360zy',
+        name: '360资源',
+        baseUrl: 'https://360zy.com/api.php/provide/vod',
         searchPath: '?ac=detail&wd=',
         detailPath: '?ac=detail&ids=',
         headers: {},
