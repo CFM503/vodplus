@@ -1,3 +1,10 @@
+# VODplus v0.9.30 - 红牛3 Backup Line
+
+## Features & Optimizations
+- **红牛3 Backup Line Added**: Added 红牛3 (`hongniuzy3.com`) — the backup domain of the 红牛 resource network (same CDN as the existing 红牛 line, same MacCMS JSON API, segment CORS allows `vodplus.pages.dev`). If the primary 红牛 domain fails, the line switcher now has a fallback. Added to `CONFIG.LINE_PREFERENCE` right after 红牛 so automatic failover tries it before moving to slower lines.
+
+---
+
 # VODplus v0.9.29 - Resume Playback After HLS Recovery
 
 ## Bug Fixes

@@ -117,7 +117,7 @@ export const CONFIG = {
     // 典型场景: 直连速度贴着码率临界点 (如量子源 ~112KB/s vs 100KB/s 码率), 稍有波动就缓冲
     AUTO_SWITCH_LINE: true,
     // 自动切换的线路偏好顺序 (按实测 CDN 速度从快到慢; 只列出已知快的, 其余线路按原顺序排在后面)
-    LINE_PREFERENCE: ['jisu', '360zy', 'hongniu', 'guangsu', 'jinying', 'haohua', 'subo', 'huya', 'liangzi', 'feifan'],
+    LINE_PREFERENCE: ['jisu', '360zy', 'hongniu', 'hongniu3', 'guangsu', 'jinying', 'haohua', 'subo', 'huya', 'liangzi', 'feifan'],
 
     // API 数据缓存时间 (秒)
     // 控制首页/详情页数据在边缘节点缓存多久，减少重复请求。

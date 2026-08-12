@@ -39,6 +39,16 @@ export const RESOURCE_SITES: ResourceSite[] = [
         headers: {},
     },
     {
+        // v0.9.30: 红牛网络备用域名 (同一 CDN, 主域名失效时兜底)
+        id: 'hongniu3',
+        name: '红牛3',
+        region: 'SJC',
+        baseUrl: 'https://www.hongniuzy3.com/api.php/provide/vod/',
+        searchPath: '?ac=detail&wd=',
+        detailPath: '?ac=detail&ids=',
+        headers: {},
+    },
+    {
         id: 'jisu',
         name: '极速资源',
         region: 'HKG',
