@@ -23,12 +23,14 @@ interface UseVideoEventsProps {
     isLoading: boolean;
     hasPrefetchedNextRef: React.RefObject<boolean>;
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
+    // v0.9.27: 用户手动暂停标记 (自动续播/重试时尊重用户暂停意图)
+    userPausedRef?: React.MutableRefObject<boolean>;
 }
 
 export function useVideoEvents({
     url, videoRef, onEnded, autoplay, nextEpisodeUrl,
     playbackRate, volume, isMuted, setIsMuted, isLoading, hasPrefetchedNextRef,
-    onTimeUpdate
+    onTimeUpdate, userPausedRef
 }: UseVideoEventsProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -63,8 +65,15 @@ export function useVideoEvents({
         const video = videoRef.current;
         if (!autoplay || !video || isLoading) return;
 
+        // v0.9.27: autoplay 意图真正生效时清除用户暂停标记。
+        // 手动选择新剧集/新线路 = 隐含播放意图 (pendingAutoplay=true);
+        // 暂停后换源会走 pendingAutoplay=false, autoplay 为 false, 不会进入这里。
+        if (userPausedRef) userPausedRef.current = false;
+
         const attemptPlay = () => {
             if (!video || video.paused === false) return;
+            // v0.9.27: 用户手动暂停后不再自动续播
+            if (userPausedRef?.current) return;
             const playPromise = video.play();
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
@@ -89,7 +98,8 @@ export function useVideoEvents({
         // 安全网：canplay 时如果视频仍然暂停，重试播放
         // 处理 HLS 生命周期竞态（MEDIA_ATTACHED 晚于 MANIFEST_PARSED）
         const onCanPlay = () => {
-            if (autoplayRef.current && video.paused) {
+            // v0.9.27: 用户手动暂停后不再被 canplay 兜底抢播
+            if (autoplayRef.current && !userPausedRef?.current && video.paused) {
                 attemptPlay();
             }
         };
@@ -169,8 +179,13 @@ export function useVideoEvents({
         const handlePlaying = () => {
             setIsBuffering(false);
             setIsPlaying(true);
+            // v0.9.27: 同步真实播放状态到外部 (换源时 pendingAutoplay 依赖它, 防止暂停后换源被自动续播)
+            if (onTimeUpdateRef.current) onTimeUpdateRef.current(video.currentTime, video.duration, true);
         };
-        const handlePause = () => setIsPlaying(false);
+        const handlePause = () => {
+            setIsPlaying(false);
+            if (onTimeUpdateRef.current) onTimeUpdateRef.current(video.currentTime, video.duration, false);
+        };
         const handleSeeking = () => setIsBuffering(true);
         const handleSeeked = () => {
             setIsBuffering(false);
@@ -178,6 +193,7 @@ export function useVideoEvents({
         };
         const handleEnded = () => {
             setIsPlaying(false);
+            if (onTimeUpdateRef.current) onTimeUpdateRef.current(video.currentTime, video.duration, false);
             // 播放结束，自动清除进度缓存 (localStorage)
             const key = getProgressKey(url);
             localStorage.removeItem(key);

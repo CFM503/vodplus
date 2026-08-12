@@ -1,3 +1,12 @@
+# VODplus v0.9.27 - Play Button State Fix & Stall Recovery Watchdog
+
+## Bug Fixes
+- **Play Button State After Pause + Line Switch**: Fixed the player showing the pause icon after "pause → switch line" (the new line auto-played against the user's pause intent). Root cause: `playbackStateRef.isPlaying` was only updated on `timeupdate` events, which stop firing once paused, so the line switch computed `pendingAutoplay=true` and auto-played the new source. Now `pause`/`playing`/`ended` events sync the real playback state, `togglePlay` records user pause intent (`userPausedRef`) and reverts its optimistic state when `play()` fails, and the `canplay` auto-retry respects manual pauses.
+- **Playback Stall Watchdog Rewrite**: Fixed "video stops, buffering stops, then permanently stuck". The old stall detector relied on repeated `waiting` events and a `readyState < 3` gate — both can silently stop firing (stale buffered data keeps `readyState >= 3`, and `waiting` never re-fires), and a `skipStall` early-return could permanently disable detection. Replaced with a 1-second heartbeat that watches `video.currentTime` progress and escalates through: `hls.startLoad()` → skip 5s (+ quality downgrade) → `recoverMediaError()` full reset → auto line-switch. Dead sources now auto-switch within ~9s instead of spinning forever.
+- **Fatal HLS Error No Longer Destroys Player**: The `default` branch of the fatal-error handler previously called `hls.destroy()`, permanently killing the instance (every later recovery call was a no-op). It now recovers via `recoverMediaError()` with the stall watchdog as a fallback.
+
+---
+
 # VODplus v0.9.26 - CDN Node Location Markers in Settings
 
 ## Features & Optimizations

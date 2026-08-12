@@ -156,7 +156,15 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                                 hls.recoverMediaError();
                                 break;
                             default:
-                                hls.destroy();
+                                // v0.9.27: 其他致命错误 (如 INTERNAL_EXCEPTION) 不再直接 destroy 导致永久卡死,
+                                // 改为完整重置 hls 实例, 由播放器卡顿看门狗兜底 (多次无效会自动换线)
+                                logger.error('VideoPlayer', 'HLS fatal other error, attempting recovery', data);
+                                try {
+                                    hls.recoverMediaError();
+                                } catch (e) {
+                                    logger.error('VideoPlayer', 'HLS recovery failed, destroying', e);
+                                    hls.destroy();
+                                }
                                 break;
                         }
                     });

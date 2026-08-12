@@ -40,6 +40,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     const containerRef = useRef<HTMLDivElement>(null);
     const progressBarRef = useRef<HTMLDivElement>(null);
     const lastSeekEndTimeRef = useRef(0);
+    // v0.9.27: 用户手动暂停标记 (暂停后换源/自动续播时尊重用户暂停意图)
+    const userPausedRef = useRef(false);
 
     // ===========================
     // Cross-cutting State (owned by orchestrator, used by multiple hooks)
@@ -198,6 +200,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         isLoading: hlsSource.isLoading,
         hasPrefetchedNextRef: hlsSource.hasPrefetchedNextRef,
         onTimeUpdate,
+        userPausedRef,
     });
 
     // 4. Gestures
@@ -229,11 +232,18 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         const video = videoRef.current;
         if (!video) return;
         if (video.paused) {
+            // v0.9.27: 用户主动播放 → 清除暂停标记 (后续换源/续播尊重此意图)
+            userPausedRef.current = false;
             video.play().catch(error => {
-                if (error instanceof Error && error.name !== 'AbortError') { /* ignore */ }
+                if (error instanceof Error && error.name !== 'AbortError') {
+                    // v0.9.27: play() 失败时回退乐观状态, 防止按钮显示与实际不符
+                    setIsPlaying(false);
+                }
             });
             setIsPlaying(true);
         } else {
+            // v0.9.27: 用户主动暂停 → 记录暂停意图 (暂停后换源不再被自动续播)
+            userPausedRef.current = true;
             video.pause();
             setIsPlaying(false);
         }
