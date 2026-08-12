@@ -1,3 +1,12 @@
+# VODplus v0.9.23 - More Resource Stations for Playback Lines
+
+## Features & Optimizations
+- **6 New Resource Stations**: Added 豪华资源 (`haohuazy.com`), 速播资源 (`subocj.com`), 虎牙资源 (`huyazy.net`), 飘零资源 (`p2100.net`), 艾旦资源 (`lovedan.net`), 最大资源 (`zuidazy.me`) to `src/lib/resources.ts`, expanding cross-source line options from 8 to 14 sites.
+- **Verified Sources**: All 6 new stations verified end-to-end - API reachable, cover popular titles (e.g. 长安十二时辰), CDN segment throughput measured from CN network, and m3u8/segment endpoints return `Access-Control-Allow-Origin` allowing `vodplus.pages.dev` for hls.js playback.
+- **Faster Multi-Source Matching**: Bumped `CLIENT_MATCH_CONCURRENCY` from 3 to 5 so the client-side line matcher finishes sooner with 14 candidate sites (each site uses a distinct domain, so browser same-origin limits don't apply).
+
+---
+
 # VODplus v0.9.22 - Mobile Gesture Brightness & Fit Height Reliability Fix
 
 ## Bug Fixes

@@ -34,7 +34,8 @@ export const CONFIG = {
     // 竞速匹配总超时上限 (毫秒)，到期即收工返回已有候选，防范全源挂起 SSR 渲染
     MATCH_TOTAL_TIMEOUT: 5500,
     // 客户端跨源线路由浏览器发起分散请求的并发限制 (默认: 3，避开与 HLS 抢带宽)
-    CLIENT_MATCH_CONCURRENCY: 3,
+    // v2: 资源站增至 14 个, 提高到 5 加快线路匹配完成速度 (各站域名不同, 不受同域 6 连接限制)
+    CLIENT_MATCH_CONCURRENCY: 5,
     // 客户端单个源搜索请求超时时间 (毫秒, 默认: 5000)
     CLIENT_MATCH_TIMEOUT_MS: 5000,
     // 是否开启去除括号副标题的二次匹配 (如：长安十二时辰(粤语) 与 长安十二时辰)
