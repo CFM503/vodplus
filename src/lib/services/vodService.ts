@@ -44,7 +44,7 @@ export async function fetchFromSource(source: ResourceSite, params: string = '',
 }
 
 
-export async function getRecentMovies(sourceId: string = 'feifan', page: number = 1, type: 'movie' | 'tv' = 'movie', disabledSources: string[] = [], customLocalUrl: string = '') {
+export async function getRecentMovies(sourceId: string = 'feifan', page: number = 1, type: 'movie' | 'tv' = 'movie', disabledSources: string[] = [], customLocalUrl: string = '', customSources?: ResourceSite[]) {
     if (sourceId === 'tmdb') {
         try {
             const provider = getMetadataProvider(sourceId);
@@ -79,7 +79,8 @@ export async function getRecentMovies(sourceId: string = 'feifan', page: number 
         };
     }
 
-    const source = RESOURCE_SITES.find(s => s.id === sourceId) || RESOURCE_SITES[0];
+    // v0.9.31: 内置源优先, 否则查找用户自定义源
+    const source = RESOURCE_SITES.find(s => s.id === sourceId) || customSources?.find(s => s.id === sourceId) || RESOURCE_SITES[0];
     return fetchFromSource(source, `?ac=detail&pg=${page}&t=`, false, CONFIG.LIST_TIMEOUT || 4000);
 }
 

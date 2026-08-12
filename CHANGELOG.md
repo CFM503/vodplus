@@ -1,3 +1,10 @@
+# VODplus v0.9.32 - Custom Sources in Library Page
+
+## Bug Fixes
+- **Custom Sources Now Appear in 片库 (资源库)**: The library page's source selector only listed built-in stations, so UI-added custom sources were invisible there (and even if navigated to, the list loader silently fell back to the first built-in source). The selector now merges in custom sources (filtered by disabled state), and `getRecentMovies` resolves them so each custom source's latest-content feed loads correctly.
+
+---
+
 # VODplus v0.9.31 - Source List Import/Export & Custom Sources
 
 ## Features & Optimizations

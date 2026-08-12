@@ -25,9 +25,10 @@ export default async function LatestPage({ searchParams }: PageProps) {
 
     // Read preferences
     const cookieStore = await cookies();
-    const { disabledSources, customLocalUrl } = await getUserPreferences(cookieStore);
+    const { disabledSources, customLocalUrl, customSources } = await getUserPreferences(cookieStore);
 
-    const availableSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));
+    // v0.9.31: 源选择器包含自定义源
+    const availableSources = [...RESOURCE_SITES, ...customSources].filter(s => !disabledSources.includes(s.id));
     const sourceId = source || metadata.id;
     const pageNum = parseInt(page || '1');
     const mediaType = type || 'movie';
@@ -90,6 +91,7 @@ export default async function LatestPage({ searchParams }: PageProps) {
                         mediaType={mediaType}
                         disabledSources={disabledSources}
                         customLocalUrl={customLocalUrl}
+                        customSources={customSources}
                     />
                 </Suspense>
             </main>
@@ -99,12 +101,13 @@ export default async function LatestPage({ searchParams }: PageProps) {
 
 // Wrapper to handle server-side data fetching for all sources
 import { getRecentMovies } from '@/lib/services/vodService';
+import { ResourceSite } from '@/lib/resources';
 
-async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources, customLocalUrl }: { sourceId: string; pageNum: number; mediaType: 'movie' | 'tv'; disabledSources: string[]; customLocalUrl: string }) {
+async function MovieListWrapper({ sourceId, pageNum, mediaType, disabledSources, customLocalUrl, customSources }: { sourceId: string; pageNum: number; mediaType: 'movie' | 'tv'; disabledSources: string[]; customLocalUrl: string; customSources: ResourceSite[] }) {
     let initialData = null;
 
     try {
-        initialData = await getRecentMovies(sourceId, pageNum, mediaType, disabledSources, customLocalUrl);
+        initialData = await getRecentMovies(sourceId, pageNum, mediaType, disabledSources, customLocalUrl, customSources);
     } catch (e) {
         logger.error('LatestPage', `SSR Fetch Error for ${sourceId}:`, e);
     }
