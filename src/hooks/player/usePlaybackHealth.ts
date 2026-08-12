@@ -88,16 +88,23 @@ export function usePlaybackHealth({ videoRef, hlsRef, showToast, onGiveUp }: Use
   // 完整重置 hls 实例 (detach + attach + 从当前位置恢复加载), 可恢复 hls.js 内部管线卡死
   const resetHls = useCallback((): boolean => {
     const hls = hlsRef.current;
+    const video = videoRef.current;
     if (!hls || typeof hls.recoverMediaError !== 'function') return false;
     try {
       logger.info('卡死恢复: recoverMediaError() 完整重置');
+      // v0.9.28: recoverMediaError 内部 media.load() 会把视频置为暂停, hls.js 不会自动续播,
+      // 恢复前若是播放中则手动 resume, 否则重置后视频会停在暂停态 (看门狗也会因此误判为健康暂停)
+      const wasPlaying = !!video && !video.paused;
       hls.recoverMediaError();
+      if (wasPlaying && video) {
+        video.play().catch(() => { /* 自动播放策略拒绝/暂无数据时忽略, 继续由看门狗兜底 */ });
+      }
       return true;
     } catch (e) {
       logger.error('recoverMediaError 失败', e);
       return false;
     }
-  }, [hlsRef]);
+  }, [videoRef, hlsRef]);
 
   // 卡死达到上限 → 提示 + 自动换线
   const giveUp = useCallback(() => {

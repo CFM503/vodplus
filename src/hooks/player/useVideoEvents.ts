@@ -190,6 +190,9 @@ export function useVideoEvents({
         const handleSeeked = () => {
             setIsBuffering(false);
             if (!video.paused) setIsPlaying(true);
+            // v0.9.28: seek 后同步真实播放状态到外部 (换源时 pendingAutoplay 依赖它,
+            // 覆盖看门狗跳过 seek 后立刻换源的状态陈旧窗口)
+            if (onTimeUpdateRef.current) onTimeUpdateRef.current(video.currentTime, video.duration, !video.paused);
         };
         const handleEnded = () => {
             setIsPlaying(false);

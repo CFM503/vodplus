@@ -146,6 +146,17 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
 
                     hls.attachMedia(video);
 
+                    // v0.9.28: recoverMediaError() 内部 detach→attach 时会调用 media.load(),
+                    // 按 HTML 规范 load() 会把视频置为暂停, 而 hls.js 不会自动 play() 续播。
+                    // 因此恢复前若是播放中, 需要手动 resume, 否则恢复后视频会停在暂停态。
+                    const recoverWithResume = (hlsInstance: InstanceType<typeof Hls>, media: HTMLVideoElement | null) => {
+                        const wasPlaying = !!media && !media.paused;
+                        hlsInstance.recoverMediaError();
+                        if (wasPlaying && media) {
+                            media.play().catch(() => { /* 自动播放策略拒绝/暂无数据时忽略, 由看门狗兜底 */ });
+                        }
+                    };
+
                     hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string }) => {
                         if (!data.fatal) return;
                         switch (data.type) {
@@ -153,14 +164,17 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                                 hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                hls.recoverMediaError();
+                                // v0.9.28: recoverMediaError() 内部会 detach→attach→media.load(),
+                                // 按规范 media.load() 会把视频置为暂停, 而 hls.js 不会自动 play() 续播,
+                                // 所以恢复前若是播放中, 需要手动 resume, 否则视频会停在暂停态
+                                recoverWithResume(hls, video);
                                 break;
                             default:
                                 // v0.9.27: 其他致命错误 (如 INTERNAL_EXCEPTION) 不再直接 destroy 导致永久卡死,
                                 // 改为完整重置 hls 实例, 由播放器卡顿看门狗兜底 (多次无效会自动换线)
                                 logger.error('VideoPlayer', 'HLS fatal other error, attempting recovery', data);
                                 try {
-                                    hls.recoverMediaError();
+                                    recoverWithResume(hls, video);
                                 } catch (e) {
                                     logger.error('VideoPlayer', 'HLS recovery failed, destroying', e);
                                     hls.destroy();

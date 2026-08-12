@@ -1,3 +1,11 @@
+# VODplus v0.9.29 - Resume Playback After HLS Recovery
+
+## Bug Fixes
+- **Playback Resumes After Fatal HLS Error Recovery**: `hls.recoverMediaError()` re-attaches the media element via `media.load()`, which (per the HTML spec) pauses the video — and hls.js never calls `play()` on its own. After a fatal MEDIA_ERROR (or other fatal error) recovery, the video was therefore left paused at the recovery point, looking exactly like "playback just stopped". The player now records whether playback was active before recovery and resumes it afterward, in both the HLS error handler and the stall-watchdog's full-reset step.
+- **Playback State Synced After Seek**: The `seeked` event now reports the real playing state to the line-switch progress tracker, closing the stale-state window where a stall-skip seek followed by an immediate line switch could misjudge autoplay intent.
+
+---
+
 # VODplus v0.9.28 - hls.js 1.6.18 Upgrade
 
 ## Features & Optimizations
