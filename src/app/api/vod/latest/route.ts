@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
 
     // Read preferences from cookies (shared with server components)
     const cookieStore = await cookies();
-    const { disabledSources, customLocalUrl } = await getUserPreferences(cookieStore);
+    const { disabledSources, customLocalUrl, customSources } = await getUserPreferences(cookieStore);
 
     try {
-        const data = await getRecentMovies(source, page, type, disabledSources, customLocalUrl);
+        const data = await getRecentMovies(source, page, type, disabledSources, customLocalUrl, customSources);
         return NextResponse.json(data);
     } catch (error) {
         logger.error('LatestAPI', 'Error:', error);

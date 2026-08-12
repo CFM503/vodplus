@@ -34,8 +34,9 @@ function cleanText(raw: string): string {
  * 图片地址净化：取第一个 # 之前的部分，且必须为纯净的 http(s) URL。
  * 注入站把 #{if:...}{end if} 模板代码放在 pic 最前面，按 # 切割后为空 → 丢弃。
  * 合法 URL 中带 #fragment 的（如 ?x=1#frag）会被保留 query 部分，同样安全。
+ * 幂等：对已净化地址再次调用是 no-op。normalizer 对 JSON 源也调用同一函数。
  */
-function sanitizePicUrl(raw: string): string {
+export function sanitizePicUrl(raw: string): string {
     if (!raw) return '';
     const beforeHash = raw.split('#')[0].trim();
     if (!/^https?:\/\/[^\s"'<>]+$/.test(beforeHash)) return '';

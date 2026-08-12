@@ -30,7 +30,10 @@ export function MovieList({ sourceId, pageNum, mediaType, initialData = null }: 
     }
 
     // Pagination limits
-    const maxPages = sourceId === metadata.id ? 5 : 50;
+    // v0.9.34: 按站方实际 pagecount 封顶 (SeaCMS 单页站只提供 1 页时诚实显示"已封顶",
+    // 而不是让用户翻过 50 页重复内容); 内置大站 pagecount 数千, 仍按 50 页封顶
+    const reportedPages = Number(initialData?.pagecount);
+    const maxPages = sourceId === metadata.id ? 5 : (reportedPages > 0 ? Math.min(reportedPages, 50) : 50);
     const hasNextPage = page < maxPages;
 
     if (!isLoading && list.length === 0) {

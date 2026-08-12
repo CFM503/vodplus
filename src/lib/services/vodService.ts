@@ -146,7 +146,10 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
     const source = RESOURCE_SITES.find(s => s.id === sourceId) || customSources?.find(s => s.id === sourceId);
     if (!source) return null;
     const res = await fetchFromSource(source, `${source.detailPath}${id}`);
-    return res.list[0] || null;
+    // v0.9.34: 部分 SeaCMS 站忽略 ids 参数, 详情接口返回整个最新列表 (如快看站)。
+    // 若返回的是列表而非单条, 按 id 精确匹配, 避免详情页展示错误的影片。
+    const found = (res.list || []).find((m: any) => String(m.vod_id) === String(id));
+    return found || res.list[0] || null;
 }
 
 const internalCachedGetMovieDetail = unstable_cache(

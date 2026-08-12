@@ -1,3 +1,15 @@
+# VODplus v0.9.34 - 全源图片净化 & 自定义源详情/分页修复
+
+## Features & Optimizations
+- **全源图片地址统一净化 (安全)**: The pic-URL sanitizer (previously applied only in the SeaCMS XML parser) now runs in the normalizer, which every source's data passes through — built-in JSON stations, XML stations, and custom sources alike. Any poisoned `<pic>` field (backdoor template `#{if:...}{end if}`, XSS `onerror=...`, whatever the injection position) is stripped before it reaches the UI, API responses, or caches; invalid addresses fall back to the themed placeholder instead of a broken image. The sanitizer is idempotent, so double-sanitization is a no-op.
+
+## Bug Fixes
+- **Custom Sources Show Wrong Data on Page Navigation**: The `/api/vod/latest` route read user preferences but omitted `customSources`, so when the client-side pagination fallback fired for a custom source, `getRecentMovies` couldn't resolve the custom ID and silently fell back to the first built-in source (非凡). Custom sources are now passed through, so page 2+ of a custom source loads that source's data.
+- **Detail Page Could Show the Wrong Movie for SeaCMS Stations**: Several SeaCMS stations (including the reference station) ignore the `ids` parameter and always return their latest 20-item list for detail requests. `getMovieDetail` took `res.list[0]`, so clicking any non-newest movie opened the newest movie's detail page. It now matches the requested ID within the returned list first (falling back to `list[0]`), which is correct for both well-behaved MacCMS JSON stations (single-item lists) and broken SeaCMS stations (full lists).
+- **Library Pagination Now Capped by the Station's Real Page Count**: The library page previously offered up to 50 pages for every non-TMDB source, so one-page-only SeaCMS stations let users page through 50 identical pages. The "next page" limit is now `min(station pagecount, 50)` — single-page stations honestly show "已封顶" (capped) instead of repeating content.
+
+---
+
 # VODplus v0.9.33 - SeaCMS XML 采集协议支持
 
 ## Features & Optimizations

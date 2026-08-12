@@ -2,6 +2,7 @@ import { Movie, ApiResponse } from '@/types';
 import { RESOURCE_SITES, ResourceSite } from '../resources';
 import { getProxyImage, getThemedPlaceholder } from '../utils';
 import { CONFIG } from '@/config/config';
+import { sanitizePicUrl } from './seaCmsXml';
 
 export function normalizeVodResponse(data: any, source: ResourceSite, duration: number): ApiResponse {
     if (!data) {
@@ -9,7 +10,10 @@ export function normalizeVodResponse(data: any, source: ResourceSite, duration: 
     }
 
     const movies: Movie[] = (data.list || data.data || []).map((m: any) => {
-        const rawPic = m.vod_pic || m.pic;
+        // 所有来源(JSON/XML/自定义)统一净化图片地址:
+        // 被投毒采集站会在 pic 字段混入 #{if:...}{end if} 模板后门 / XSS payload,
+        // 净化后脏数据不进入页面、接口、缓存;无效地址返回空串走占位图
+        const rawPic = sanitizePicUrl(m.vod_pic || m.pic);
         const typeName = m.type_name || m.type;
         const vodName = m.vod_name || m.name;
         const picUrl = rawPic
