@@ -17,6 +17,8 @@ interface VideoPlayerProps {
     nextEpisodeUrl?: string;
     initialSeekTime?: number;
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
+    // v0.9.25: 线路连续卡顿达到上限时的回调 (自动切换线路)
+    onGiveUp?: () => void;
 }
 
 interface GestureHUDState {
@@ -30,7 +32,7 @@ interface ToastState {
     visible: boolean;
 }
 
-export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate }: VideoPlayerProps) {
+export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp }: VideoPlayerProps) {
     // ===========================
     // Shared Refs
     // ===========================
@@ -174,6 +176,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         videoRef,
         hlsRef: hlsSource.hlsRef,
         showToast,
+        onGiveUp,
     });
 
     // Reset skip count when URL changes (new video source)

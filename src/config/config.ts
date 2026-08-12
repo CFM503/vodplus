@@ -90,11 +90,11 @@ export const CONFIG = {
     // 默认起播缓冲长度 (秒)
     // 降低此值可加快起播速度，HLS.js 会在播放中自动继续缓冲更多。
     // 建议: 10 (快速起播) ~ 30 (抗卡顿)
-    DEFAULT_BUFFER_LENGTH: 15,
+    DEFAULT_BUFFER_LENGTH: 20,
     // 网络自适应缓冲配置
     BUFFER_ADAPTIVE: true,
-    BUFFER_LOW_BW: 5,
-    BUFFER_HIGH_BW: 20,
+    BUFFER_LOW_BW: 8,
+    BUFFER_HIGH_BW: 30,
     // HLS 分片拉取最大重试超时 (毫秒)
     HLS_FRAGMENT_TRY_TIMEOUT: 10000,
 
@@ -111,6 +111,13 @@ export const CONFIG = {
 
     // 最大连续跳过次数，超过后提示用户切换线路
     MAX_STALL_SKIPS: 5,
+
+    // 线路自动切换 (v0.9.25):
+    // 当前线路反复卡顿 (达到 MAX_STALL_SKIPS) 时, 自动切换到偏好列表里更快的线路, 而不是只弹提示
+    // 典型场景: 直连速度贴着码率临界点 (如量子源 ~112KB/s vs 100KB/s 码率), 稍有波动就缓冲
+    AUTO_SWITCH_LINE: true,
+    // 自动切换的线路偏好顺序 (按实测 CDN 速度从快到慢; 只列出已知快的, 其余线路按原顺序排在后面)
+    LINE_PREFERENCE: ['jisu', '360zy', 'hongniu', 'guangsu', 'jinying', 'haohua', 'subo', 'huya', 'liangzi', 'feifan'],
 
     // API 数据缓存时间 (秒)
     // 控制首页/详情页数据在边缘节点缓存多久，减少重复请求。

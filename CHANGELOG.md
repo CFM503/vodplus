@@ -1,3 +1,13 @@
+# VODplus v0.9.25 - Auto Line-Switch on Repeated Stalls & Buffer Tuning
+
+## Features & Optimizations
+- **Automatic Line Failover on Repeated Stalls**: When the current playback line repeatedly stalls (reaching `MAX_STALL_SKIPS`, ~15s of continuous buffering), the player now **automatically switches to the next preferred line** instead of only showing a manual-switch hint. This directly fixes razor-edge bandwidth cases (e.g. 量子 EU node at ~112 KB/s vs 100 KB/s bitrate) where skipping/downgrading cannot help because the source only exposes a single quality level.
+- **Speed-Ordered Line Preference**: New `CONFIG.LINE_PREFERENCE` lists lines by measured CDN speed (`jisu` HK → `360zy` CN → `hongniu` → `guangsu` → `jinying` → `haohua` → `subo` → `huya` → `liangzi` → `feifan`). Auto-switch walks this order, skipping already-tried lines (loop protection) and preserving current playback progress via the existing line-switch seek recovery.
+- **Visible Switch Notice**: A toast appears above the player ("当前线路卡顿，已自动切换到「极速资源」") so users know a line change happened automatically.
+- **Bigger Buffer Headroom**: Raised default buffer length 15s→20s, high-bandwidth cap 20s→30s, and weak-network floor 5s→8s so short bandwidth dips around the bitrate threshold are absorbed instead of causing immediate stalls.
+
+---
+
 # VODplus v0.9.24 - Domestic-CDN Resource Station, Slow-Line Cleanup & Build Fix
 
 ## Features & Optimizations

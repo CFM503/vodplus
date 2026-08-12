@@ -51,6 +51,11 @@ export default function ClientPlayerWrapper({
     const [clientCandidates, setClientCandidates] = useState<NonNullable<Movie['candidates']>>(candidates || []);
     const [isMatching, setIsMatching] = useState(false);
 
+    // v0.9.25: 自动切换线路 (连续卡顿达到上限时) 的循环保护与提示
+    const triedLinesRef = useRef<Set<string>>(new Set());
+    const [switchNotice, setSwitchNotice] = useState<{ msg: string; key: number } | null>(null);
+    const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Track real-time playback state (currentTime and playing status) for line switching progress recovery
     const playbackStateRef = useRef<{ currentTime: number; isPlaying: boolean }>({ currentTime: 0, isPlaying: true });
     const [pendingSeekTime, setPendingSeekTime] = useState<number | undefined>(undefined);
@@ -225,9 +230,7 @@ export default function ClientPlayerWrapper({
     }, [clientCandidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom]);
 
     const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
-        if (line.source_id === currentSourceId) return;
-
-        const nextEpisodes = parseVodPlayUrl(line.vod_play_url);
+        if (line.source_id === currentSourceId) return;        const nextEpisodes = parseVodPlayUrl(line.vod_play_url);
         if (!nextEpisodes || nextEpisodes.length === 0) {
             alert('该线路暂无有效剧集');
             return;
@@ -281,6 +284,38 @@ export default function ClientPlayerWrapper({
         setCurrentSourceId(line.source_id);
         setCurrentEpIndex(nextIndex);
     }, [currentSourceId, episodes, currentEpIndex]);
+
+    // v0.9.25: 卡顿自动切换提示 (播放器内自带 toast, 这里额外提示切到了哪条线路)
+    const showSwitchNotice = useCallback((msg: string) => {
+        setSwitchNotice({ msg, key: Date.now() });
+        if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = setTimeout(() => setSwitchNotice(null), 3500);
+    }, []);
+
+    // v0.9.25: 线路连续卡顿达到上限时, 自动切换到偏好表里更快/更稳的线路
+    // 偏好顺序来自实测 CDN 速度 (见 CONFIG.LINE_PREFERENCE), 避免在当前慢线 (如量子 EU 节点) 上反复缓冲
+    const handleAutoSwitchLine = useCallback(() => {
+        if (!CONFIG.AUTO_SWITCH_LINE || allLines.length < 2) return;
+
+        // 当前线路记为失败, 防止切回后乒乓
+        triedLinesRef.current.add(currentSourceId);
+
+        // 按偏好顺序排序: LINE_PREFERENCE 里的线路优先, 其余按原顺序追加
+        const knownIds = new Set(CONFIG.LINE_PREFERENCE);
+        const preferred = allLines.filter(l => knownIds.has(l.source_id));
+        const rest = allLines.filter(l => !knownIds.has(l.source_id));
+        const ordered = [...preferred, ...rest];
+
+        // 找下一个未尝试过的线路 (且不是当前线路)
+        const next = ordered.find(l => l.source_id !== currentSourceId && !triedLinesRef.current.has(l.source_id));
+        if (!next) {
+            showSwitchNotice('所有线路都已尝试，仍无法流畅播放');
+            return;
+        }
+
+        showSwitchNotice(`当前线路卡顿，已自动切换到「${next.source_name}」`);
+        handleSwitchSource(next);
+    }, [allLines, currentSourceId, handleSwitchSource, showSwitchNotice]);
 
     const handleEpisodeEnd = useCallback(() => {
         setPendingSeekTime(undefined);
@@ -354,6 +389,7 @@ export default function ClientPlayerWrapper({
                         nextEpisodeUrl={hasNext ? episodes[currentEpIndex + 1].url : undefined}
                         initialSeekTime={pendingSeekTime}
                         onTimeUpdate={handleTimeUpdate}
+                        onGiveUp={handleAutoSwitchLine}
                     />
                 ) : (
                     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/5">
@@ -361,6 +397,15 @@ export default function ClientPlayerWrapper({
                     </div>
                 )}
             </div>
+
+            {/* v0.9.25: 卡顿自动切换提示 */}
+            {switchNotice && (
+                <div key={switchNotice.key} className="flex justify-center -mt-2">
+                    <div className="px-4 py-2 rounded-lg bg-indigo-600/90 text-white text-xs font-medium shadow-lg border border-indigo-400/50 animate-in fade-in">
+                        {switchNotice.msg}
+                    </div>
+                </div>
+            )}
 
             {/* Line Selection */}
             {allLines.length >= 2 && (
@@ -385,7 +430,7 @@ export default function ClientPlayerWrapper({
                             return (
                                 <button
                                     key={line.source_id}
-                                    onClick={() => handleSwitchSource(line)}
+                                    onClick={() => { triedLinesRef.current = new Set(); handleSwitchSource(line); }}
                                     className={cn(
                                         "px-3 py-1.5 text-xs font-medium rounded-lg transition-all border cursor-pointer",
                                         isCurrent

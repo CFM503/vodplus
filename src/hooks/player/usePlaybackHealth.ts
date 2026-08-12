@@ -7,9 +7,11 @@ interface UsePlaybackHealthProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   hlsRef: React.RefObject<InstanceType<typeof Hls> | null>;
   showToast: (message: string) => void;
+  // v0.9.25: 线路连续卡顿达到上限时的回调 (用于自动切换到更快线路)
+  onGiveUp?: () => void;
 }
 
-export function usePlaybackHealth({ videoRef, hlsRef, showToast }: UsePlaybackHealthProps) {
+export function usePlaybackHealth({ videoRef, hlsRef, showToast, onGiveUp }: UsePlaybackHealthProps) {
   // 连续跳过次数计数
   const skipCountRef = useRef(0);
   // 卡死检测定时器
@@ -47,8 +49,14 @@ export function usePlaybackHealth({ videoRef, hlsRef, showToast }: UsePlaybackHe
       showToast(`视频卡顿，已跳过 ${CONFIG.STALL_SKIP_SECONDS} 秒`);
     } else {
       showToast('当前视频源不稳定，建议切换线路');
+      // v0.9.25: 卡顿已达上限, 触发自动切换 (切到偏好表里更快的线路)
+      if (CONFIG.AUTO_SWITCH_LINE && onGiveUp) {
+        // 重置计数, 允许切换后若仍卡顿可再次触发
+        skipCountRef.current = 0;
+        onGiveUp();
+      }
     }
-  }, [showToast]);
+  }, [showToast, onGiveUp]);
 
   // 启动卡死检测
   const startStallDetection = useCallback(() => {
