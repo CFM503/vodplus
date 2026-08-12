@@ -1,3 +1,10 @@
+# VODplus v0.9.28 - hls.js 1.6.18 Upgrade
+
+## Features & Optimizations
+- **hls.js Upgraded to 1.6.18 (Stable Patch Line)**: Bumped hls.js from 1.6.15 to 1.6.18 (exact-pinned for deterministic builds). The 1.6.17 patches include the "PTS rollover condition causing segment 0 loop" fix and a `mapPartIntersection` loop-bounds fix — both in the same class as the playback-stall / stuck-buffering bugs reported on this site. The 1.6.x line is the current stable release (v1.7.0 is still in RC and is not used in production). All player APIs used by vodplus are unchanged (semver-compatible within 1.6.x), so this is a drop-in upgrade with no code changes.
+
+---
+
 # VODplus v0.9.27 - Play Button State Fix & Stall Recovery Watchdog
 
 ## Bug Fixes
