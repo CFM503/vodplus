@@ -203,7 +203,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                                 <div className="flex items-center gap-3 text-left">
                                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-colors ${isDisabled ? 'bg-slate-800 text-slate-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{source.name.charAt(0)}</div>
                                                     <div>
-                                                        <div className="font-bold text-sm text-white">{source.name}</div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="font-bold text-sm text-white">{source.name}</div>
+                                                            {source.region && (
+                                                                <span className="text-[10px] px-1 py-0.5 rounded bg-slate-700/40 text-slate-400 font-mono whitespace-nowrap">({source.region})</span>
+                                                            )}
+                                                        </div>
                                                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">{source.id}</div>
                                                     </div>
                                                 </div>

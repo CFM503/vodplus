@@ -1,3 +1,11 @@
+# VODplus v0.9.26 - CDN Node Location Markers in Settings
+
+## Features & Optimizations
+- **CDN Node Location Markers**: Settings → 资源站管理 now shows each station's CDN node location as a concise airport-code marker after the name: `(HKG)` 香港 · `(CN)` 国内 · `(SJC)` 美国圣何塞 · `(LAX)` 美国洛杉矶 · `(FRA)` 法兰克福 · `(EWR/FRA)` 美东/法兰克福 · `(?)` 未知 · `(X)` 失效. Locations were determined by geolocating each station's actual segment CDN IPs during the v0.9.23/24 speed-test rounds.
+- **Quick Line Selection**: The markers make it trivial to spot the fast lines from mainland China - `(HKG)` 极速 and `(CN)` 360资源 - while `(X)` 无尽 can be disabled directly from the list.
+
+---
+
 # VODplus v0.9.25 - Auto Line-Switch on Repeated Stalls & Buffer Tuning
 
 ## Features & Optimizations
