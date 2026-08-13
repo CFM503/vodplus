@@ -79,8 +79,11 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
         notFound();
     }
 
-    // Parse play urls using dedicated parser
-    const episodes = parseVodPlayUrl(movie.vod_play_url);
+    // Parse play urls using dedicated parser。
+    // 传入源 baseUrl，用于把相对播放地址解析为绝对地址。
+    const sourceBaseUrl = RESOURCE_SITES.find(s => s.id === movie.source_id)?.baseUrl
+        || customSources.find(s => s.id === movie.source_id)?.baseUrl;
+    const episodes = parseVodPlayUrl(movie.vod_play_url, sourceBaseUrl);
     const safeEpisodes = episodes.length > 0 ? episodes : [];
 
     // Extract CDN hostname from the first episode URL for preconnect hint
@@ -112,7 +115,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
                             poster={movie.vod_pic}
                             candidates={movie.candidates || []}
                             initialSourceId={movie.source_id || sourceId}
-                            initialSourceName={movie.vod_play_from || ''}
+                            initialSourceName={movie.source_name || movie.vod_play_from || ''}
                             vodPlayUrl={movie.vod_play_url}
                             vodPlayFrom={movie.vod_play_from}
                             movieName={movie.vod_name}
@@ -146,7 +149,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
                         <div className="flex gap-3">
                             <Globe className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                             <span>
-                                <strong className="text-slate-100">来源:</strong> {movie.vod_play_from || '未知数据源'}
+                                <strong className="text-slate-100">来源:</strong> {movie.source_name || movie.vod_play_from?.split('$$$')[0] || '未知数据源'}
                             </span>
                         </div>
                     </div>

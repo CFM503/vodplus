@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-
-// 清洗并获取进度的唯一缓存 Key，去除动态签名等 Query 参数
-const getProgressKey = (videoUrl: string) => {
-    try {
-        const parsed = new URL(videoUrl);
-        return `VOD_PROGRESS_${parsed.origin}${parsed.pathname}`;
-    } catch (e) {
-        return `VOD_PROGRESS_${videoUrl}`;
-    }
-};
+import { getProgressKey } from '@/lib/player-utils';
 
 interface UseVideoEventsProps {
     url: string;
@@ -25,12 +16,14 @@ interface UseVideoEventsProps {
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
     // v0.9.27: 用户手动暂停标记 (自动续播/重试时尊重用户暂停意图)
     userPausedRef?: React.MutableRefObject<boolean>;
+    // v0.9.x: 长按加速中标记 (加速中不要被同步 effect 覆盖回原倍速)
+    isSpeedHolding?: boolean;
 }
 
 export function useVideoEvents({
     url, videoRef, onEnded, autoplay, nextEpisodeUrl,
     playbackRate, volume, isMuted, setIsMuted, isLoading, hasPrefetchedNextRef,
-    onTimeUpdate, userPausedRef
+    onTimeUpdate, userPausedRef, isSpeedHolding = false
 }: UseVideoEventsProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -258,11 +251,15 @@ export function useVideoEvents({
     // Sync playback rate, volume, mute to video element
     useEffect(() => {
         if (videoRef.current && !isLoading) {
-            videoRef.current.playbackRate = playbackRate;
+            // 长按加速期间由 useVideoGestures 直接设置 video.playbackRate，
+            // 不要用 state 中的 playbackRate 覆盖，避免 3x 被拉回 1x。
+            if (!isSpeedHolding) {
+                videoRef.current.playbackRate = playbackRate;
+            }
             videoRef.current.volume = volume;
             videoRef.current.muted = isMuted;
         }
-    }, [playbackRate, volume, isMuted, isLoading]);
+    }, [playbackRate, volume, isMuted, isLoading, isSpeedHolding]);
 
     return {
         isPlaying,

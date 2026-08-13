@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { RESOURCE_SITES } from '@/lib/resources';
+import { RESOURCE_SITES, type ResourceSite } from '@/lib/resources';
 import { useSettings } from '@/hooks/useSettings';
 import { mergeSources, buildExportPayload, validateImportPayload } from '@/lib/sourceConfig';
-import { X, Check, Search, Settings2, Trash2, Film, Tv, Link as LinkIcon, AlertCircle, Download, Upload, Plus } from 'lucide-react';
+import { X, Check, Search, Settings2, Trash2, Film, Tv, Link as LinkIcon, AlertCircle, Download, Upload, Plus, Pencil } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -16,7 +16,7 @@ interface SettingsModalProps {
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const { mounted, settings, setters, saveSettings } = useSettings(isOpen);
     const { disabledSources, movieSource, tvSource, customLocalUrl, customSources } = settings;
-    const { setDisabledSources, setMovieSource, setTvSource, setCustomLocalUrl, toggleSource, addCustomSource, removeCustomSource, importSources } = setters;
+    const { setDisabledSources, setMovieSource, setTvSource, setCustomLocalUrl, toggleSource, addCustomSource, updateCustomSource, removeCustomSource, importSources } = setters;
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'rec' | 'sources'>('rec');
@@ -25,6 +25,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newSource, setNewSource] = useState({ id: '', name: '', baseUrl: '', region: '' });
     const [formError, setFormError] = useState<string | null>(null);
+    // v0.9.x: 自定义源修改表单
+    const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState({ name: '', baseUrl: '', region: '' });
     const [showImport, setShowImport] = useState(false);
     const [importText, setImportText] = useState('');
     const [importError, setImportError] = useState<string | null>(null);
@@ -148,6 +151,50 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setFormError(null);
         setNewSource({ id: '', name: '', baseUrl: '', region: '' });
         setShowAddForm(false);
+    };
+
+    // ===== 修改自定义源 =====
+    const handleEditCustomSource = (source: ResourceSite) => {
+        setShowAddForm(false);
+        setFormError(null);
+        setEditingSourceId(source.id);
+        setEditForm({
+            name: source.name,
+            baseUrl: source.baseUrl,
+            region: source.region || '',
+        });
+    };
+
+    const handleSaveEdit = () => {
+        const name = editForm.name.trim();
+        const baseUrl = editForm.baseUrl.trim();
+
+        if (!name || !baseUrl) {
+            setFormError('名称和接口地址均为必填');
+            return;
+        }
+        if (!/^https?:\/\//.test(baseUrl)) {
+            setFormError('接口地址必须以 http:// 或 https:// 开头');
+            return;
+        }
+
+        if (!editingSourceId) {
+            setFormError('修改失败：未找到该自定义源');
+            return;
+        }
+
+        const ok = updateCustomSource(editingSourceId, {
+            name,
+            baseUrl,
+            region: editForm.region.trim() || undefined,
+        });
+        if (!ok) {
+            setFormError('修改失败：未找到该自定义源');
+            return;
+        }
+        setFormError(null);
+        setEditingSourceId(null);
+        setEditForm({ name: '', baseUrl: '', region: '' });
     };
 
     if (!isOpen || !mounted) return null;
@@ -322,6 +369,23 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     </div>
                                 )}
 
+                                {/* 修改自定义源 */}
+                                {editingSourceId && (
+                                    <div className="bg-slate-950/40 border border-amber-500/20 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
+                                        <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                                            <Pencil className="h-3.5 w-3.5" /> 修改自定义源
+                                        </div>
+                                        <input value={editForm.name} onChange={(e) => setEditForm(s => ({ ...s, name: e.target.value }))} placeholder="名称 (如 我的资源)" className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-600" />
+                                        <input value={editForm.baseUrl} onChange={(e) => setEditForm(s => ({ ...s, baseUrl: e.target.value }))} placeholder="接口地址 https://xxx/api.php/provide/vod/" className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-600 font-mono" />
+                                        <input value={editForm.region} onChange={(e) => setEditForm(s => ({ ...s, region: e.target.value }))} placeholder="节点 (可选, 如 HKG / CN)" className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-600" />
+                                        {formError && <div className="text-[11px] text-red-400">{formError}</div>}
+                                        <div className="flex gap-2 pt-1">
+                                            <button onClick={handleSaveEdit} className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all active:scale-[0.98]">保存</button>
+                                            <button onClick={() => { setEditingSourceId(null); setEditForm({ name: '', baseUrl: '', region: '' }); setFormError(null); }} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-all">取消</button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* 导入面板 */}
                                 {showImport && (
                                     <div className="bg-slate-950/40 border border-amber-500/20 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
@@ -366,9 +430,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                                 </button>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     {isCustom && (
-                                                        <button onClick={() => removeCustomSource(source.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="删除自定义源">
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
+                                                        <>
+                                                            <button onClick={() => handleEditCustomSource(source)} className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors" title="修改自定义源">
+                                                                <Pencil className="h-4 w-4" />
+                                                            </button>
+                                                            <button onClick={() => removeCustomSource(source.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="删除自定义源">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </>
                                                     )}
                                                     <button onClick={() => toggleSource(source.id)} className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all ${isDisabled ? 'border-white/5 bg-transparent' : 'border-indigo-500 bg-indigo-500 shadow-lg shadow-indigo-500/20'}`}>
                                                         <Check className={`h-3.5 w-3.5 text-white transition-opacity ${isDisabled ? 'opacity-0' : 'opacity-100'}`} />
@@ -384,7 +453,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             </div>
 
                             <div className="p-3 border-t border-white/5 bg-slate-900/50 shrink-0">
-                                <button onClick={() => setShowAddForm(v => !v)} className={`w-full py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${showAddForm ? 'bg-slate-800 text-slate-300' : 'bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 border border-indigo-500/20'}`}>
+                                <button onClick={() => { setShowAddForm(v => !v); setEditingSourceId(null); setEditForm({ name: '', baseUrl: '', region: '' }); }} className={`w-full py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${showAddForm ? 'bg-slate-800 text-slate-300' : 'bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 border border-indigo-500/20'}`}>
                                     <Plus className="h-3.5 w-3.5" /> {showAddForm ? '收起' : '添加自定义源'}
                                 </button>
                             </div>

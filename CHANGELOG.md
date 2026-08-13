@@ -1,3 +1,25 @@
+# VODplus v0.9.35 - Custom Source Playback & Mobile Gesture Fixes
+
+## Features & Optimizations
+- **Custom Source Editing**: Settings → 资源站管理 now lets you edit a UI-added custom source in place (name, base URL, region) via a pencil button, without deleting and re-adding it.
+- **Robust Custom Source Playback Parsing**: `vodParser.ts` now accepts extensionless HTTP(S) HLS endpoints, protocol-relative (`//`) and root-relative (`/`) addresses, and resolves relative play URLs against the source base URL. `$$$` / `#` / `$` separators are handled more leniently so non-standard MacCMS/SeaCMS responses still yield playable episodes.
+- **Smarter Embed Detection**: Replaced the old "no `.m3u8`/`.mp4`/`.webm` → iframe" heuristic with `isEmbedUrl`, which only treats clearly page-like URLs (`.html`/`.php`/`embed`/`iframe`) as embeds. Extensionless HLS URLs now load through hls.js.
+- **Mobile Horizontal Seek**: Horizontal swipes now perform seek with a live HUD preview (full player width = 90s, configurable via `HORIZONTAL_SEEK_SECONDS`).
+- **Real Brightness Control**: Left-side vertical swipe now applies `filter: brightness()` directly to the video element instead of only updating state; brightness persists via `VOD_BRIGHTNESS`.
+- **Clear Playback Error Feedback**: Fatal HLS errors, direct MP4 load failures, and unsupported FLV lines now show a toast instead of failing silently.
+
+## Bug Fixes
+- **Custom Source Detail Crash on Single-Object Responses**: The normalizer assumed `data.list || data.data` was always an array; single-object detail responses now normalize correctly.
+- **Detail Page Could Return an Unplayable List Item**: `getMovieDetail` no longer blindly falls back to `res.list[0]` when the requested ID isn't found; it returns an exact match, or a single playable item, otherwise falls through to search/not-found.
+- **Multi-Line `vod_play_from` Names Were Lost**: The normalizer now preserves the raw `$$$`-separated `vod_play_from`; a new `source_name` field keeps the display name clean while line parsing keeps full line names.
+- **Race Matching Ignored Custom Sources**: `performRaceMatch` now searches user custom sources in addition to built-in stations.
+- **Progress Key Collisions for Query-Identified Streams**: `getProgressKey` now keeps query params for extensionless/API-style URLs (stripping only volatile signature params), so `/api/stream?id=1` and `/api/stream?id=2` no longer share progress.
+- **Long-Press 3x Speed Could Be Reset**: The playback-rate sync effect no longer overwrites `video.playbackRate` while speed-hold is active.
+- **Brave Mobile Gesture Interference**: Player container now sets `touch-action: none` and `overscroll-behavior: none`; double-tap actions are deferred to `touchend` and skipped when the touch was a drag gesture.
+- **Source URL Joining & BOM**: `fetchRawFromSource` normalizes trailing `/` and `?` in source base URLs and strips a UTF-8 BOM before JSON/XML detection.
+
+---
+
 # VODplus v0.9.34 - 全源图片净化 & 自定义源详情/分页修复
 
 ## Features & Optimizations

@@ -24,9 +24,10 @@ interface UseHlsSourceProps {
     isEmbed: boolean;
     maxBufferLength: number;
     skipIntroTimeRef: React.RefObject<number>;
+    showToast?: (message: string) => void;
 }
 
-export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef }: UseHlsSourceProps) {
+export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef, showToast }: UseHlsSourceProps) {
     const hlsRef = useRef<InstanceType<typeof Hls> | null>(null);
     const hasSkippedIntroRef = useRef(false);
     const hasPrefetchedNextRef = useRef(false);
@@ -39,6 +40,8 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
     // 追踪 MEDIA_ATTACHED 状态，确保 play() 在视频源挂载后才执行
     const manifestParsedRef = useRef(false);
     const mediaAttachedRef = useRef(false);
+    // 每个 URL 只提示一次致命错误，避免重试循环刷屏
+    const errorNotifiedRef = useRef(false);
 
     // Reset flags on URL change
     useEffect(() => {
@@ -46,6 +49,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         hasSkippedIntroRef.current = false;
         manifestParsedRef.current = false;
         mediaAttachedRef.current = false;
+        errorNotifiedRef.current = false;
     }, [url]);
 
     // HLS initialization
@@ -63,8 +67,24 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
 
         const initPlayer = async () => {
             if (!url) return;
+            // 清理上一 URL 可能残留的原生 onerror，避免误报
+            video.onerror = null;
             if (url.includes('.mp4') || url.includes('.webm')) {
                 video.src = url;
+                video.onerror = () => {
+                    setIsLoading(false);
+                    if (!errorNotifiedRef.current) {
+                        errorNotifiedRef.current = true;
+                        showToast?.('视频加载失败：可能是不支持的格式、网络问题或 CORS 限制');
+                    }
+                };
+                setIsLoading(false);
+                return;
+            }
+
+            // FLV 无法被 HLS.js / 原生 video 直接播放，给出明确提示
+            if (/\.flv(?:[?#]|$)/i.test(url)) {
+                showToast?.('该线路为 FLV 格式，暂不支持直接播放，请切换其他线路');
                 setIsLoading(false);
                 return;
             }
@@ -161,18 +181,30 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         if (!data.fatal) return;
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
+                                if (!errorNotifiedRef.current) {
+                                    errorNotifiedRef.current = true;
+                                    showToast?.('网络异常，正在重试连接…');
+                                }
                                 hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 // v0.9.28: recoverMediaError() 内部会 detach→attach→media.load(),
                                 // 按规范 media.load() 会把视频置为暂停, 而 hls.js 不会自动 play() 续播,
                                 // 所以恢复前若是播放中, 需要手动 resume, 否则视频会停在暂停态
+                                if (!errorNotifiedRef.current) {
+                                    errorNotifiedRef.current = true;
+                                    showToast?.('视频数据错误，正在尝试恢复…');
+                                }
                                 recoverWithResume(hls, video);
                                 break;
                             default:
                                 // v0.9.27: 其他致命错误 (如 INTERNAL_EXCEPTION) 不再直接 destroy 导致永久卡死,
                                 // 改为完整重置 hls 实例, 由播放器卡顿看门狗兜底 (多次无效会自动换线)
                                 logger.error('VideoPlayer', 'HLS fatal other error, attempting recovery', data);
+                                if (!errorNotifiedRef.current) {
+                                    errorNotifiedRef.current = true;
+                                    showToast?.('播放源解析失败，请尝试切换线路');
+                                }
                                 try {
                                     recoverWithResume(hls, video);
                                 } catch (e) {

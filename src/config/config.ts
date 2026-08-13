@@ -145,6 +145,9 @@ export const CONFIG = {
     // DeltaY > DeltaX * 1.5 才算垂直滑动
     GESTURE_ASPECT_RATIO_THRESHOLD: 1.5,
 
+    // 水平滑动快进/快退：整屏宽度对应的 seek 秒数
+    HORIZONTAL_SEEK_SECONDS: 90,
+
     // 点击手势最大持续时间 (毫秒)
     // 超过此时间算长按或拖拽
     TAP_MAX_DURATION: 300,

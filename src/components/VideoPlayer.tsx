@@ -173,6 +173,12 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                 !isHovering && isPlaying && "cursor-none",
                 showSettings ? "overflow-visible" : "overflow-hidden"
             )}
+            style={{
+                touchAction: 'none',
+                overscrollBehavior: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+            }}
             onMouseEnter={handlePCMouseEnter}
             onMouseLeave={handlePCMouseLeave}
             onMouseMove={handlePCMouseMove}
@@ -190,12 +196,17 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                 poster={poster}
                 playsInline
                 preload="auto"
-                crossOrigin="anonymous"
                 muted={isMuted}
                 // touchAction: 'none' 是移动端亮度/音量手势的关键：
                 // 不设置的话，浏览器会把垂直拖动当作页面滚动并触发 touchcancel，
                 // 手势在达到 GESTURE_VERTICAL_THRESHOLD 之前就会被系统打断（进度条正是靠 touchAction none 才能拖动）
-                style={{ transform: `scale(${videoScale})`, transformOrigin: 'center center', touchAction: 'none' }}
+                style={{
+                    transform: `scale(${videoScale})`,
+                    transformOrigin: 'center center',
+                    touchAction: 'none',
+                    // 亮度手势真正作用于画面：用 CSS filter 实时改变视频明暗
+                    filter: `brightness(${brightness / 100})`,
+                }}
             />
 
             {/* Loading Spinner - z-30 */}
@@ -229,11 +240,6 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                         <span className="text-white text-base font-bold font-mono">{gestureHUD.value}</span>
                     </div>
                 </div>
-            )}
-
-            {/* Brightness Overlay - z-5 */}
-            {brightness !== 100 && (
-                <div className="absolute inset-0 pointer-events-none z-[5]" style={{ backgroundColor: `rgba(0,0,0,${1 - brightness / 100})` }} />
             )}
 
             {/* Toast - z-50 */}

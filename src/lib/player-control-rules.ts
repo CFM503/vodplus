@@ -294,22 +294,55 @@ export function useMobileVideoTouch(
     state: PlayerControlState
 ) {
     const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingDoubleTapRef = useRef(false);
     const stateRef = useLatestRef(state);
     const actionsRef = useLatestRef(actions);
 
-    // 触摸开始时检测双击
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // 触摸开始时只记录是否为双击，不立即执行动作。
+    // 原因：第二次触摸可能是水平/垂直手势的起点，若在 touchstart 立即快进/快退会与手势冲突。
+    const handleTouchStart = useCallback((_e: React.TouchEvent) => {
         const now = Date.now();
         const timeSinceLastTap = now - refs.lastTapRef.current;
         const isDoubleTap = timeSinceLastTap < PLAYER_CONTROL_CONFIG.DOUBLE_TAP_DELAY;
 
-        if (isDoubleTap && refs.containerRef.current) {
-            // Cancel pending single-tap controls toggle
+        pendingDoubleTapRef.current = isDoubleTap;
+
+        if (isDoubleTap) {
+            // 取消上一次单击的控制栏开关
             if (pendingTimerRef.current) {
                 clearTimeout(pendingTimerRef.current);
                 pendingTimerRef.current = null;
             }
+        }
 
+        // 注意：不在这里写 lastTapRef！必须在 handleTouchEnd 中写入，
+        // 否则 handleTouchEnd 读取时 timeSinceLastTap = 触摸持续时间（~100ms），
+        // 永远 < 300ms，导致 isDoubleTap 恒为 true，单击处理永远不会执行。
+    }, []); // stable
+
+    // 触摸结束时：先判定手势，再执行双击动作，最后处理单击开关
+    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+        refs.touchEndTimeRef.current = Date.now();
+
+        if (pendingTimerRef.current) {
+            clearTimeout(pendingTimerRef.current);
+            pendingTimerRef.current = null;
+        }
+
+        const now = Date.now();
+        const timeSinceLastTap = now - refs.lastTapRef.current;
+        const isDoubleTap = timeSinceLastTap < PLAYER_CONTROL_CONFIG.DOUBLE_TAP_DELAY;
+
+        // 记录本次触摸结束时间，供下次双击检测使用
+        refs.lastTapRef.current = now;
+
+        // 先交由手势处理器判定本次触摸是否为拖拽手势（亮度/音量/seek/长按倍速）
+        const wasGesture = !!actionsRef.current.handleTouchEnd?.(e);
+
+        const shouldDoubleTap = isDoubleTap && pendingDoubleTapRef.current && !wasGesture && !stateRef.current.showSettings;
+        pendingDoubleTapRef.current = false;
+
+        if (shouldDoubleTap && refs.containerRef.current) {
             const container = refs.containerRef.current;
             const rect = container.getBoundingClientRect();
             const x = e.changedTouches[0].clientX;
@@ -328,33 +361,8 @@ export function useMobileVideoTouch(
                 // 中间 → 播放/暂停
                 togglePlay();
             }
+            return;
         }
-
-        // 注意：不在这里写 lastTapRef！必须在 handleTouchEnd 中写入，
-        // 否则 handleTouchEnd 读取时 timeSinceLastTap = 触摸持续时间（~100ms），
-        // 永远 < 300ms，导致 isDoubleTap 恒为 true，单击处理永远不会执行。
-    }, []); // stable
-
-    // 触摸结束时处理单击（延迟执行以避免与双击冲突）
-    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-        refs.touchEndTimeRef.current = Date.now();
-
-        // Cancel any pending single-tap action
-        if (pendingTimerRef.current) {
-            clearTimeout(pendingTimerRef.current);
-            pendingTimerRef.current = null;
-        }
-
-        const now = Date.now();
-        const timeSinceLastTap = now - refs.lastTapRef.current;
-        const isDoubleTap = timeSinceLastTap < PLAYER_CONTROL_CONFIG.DOUBLE_TAP_DELAY;
-
-        // 记录本次触摸结束时间，供下次双击检测使用
-        refs.lastTapRef.current = now;
-
-        // 先交由手势处理器判定本次触摸是否为拖拽手势（亮度/音量/长按倍速）。
-        // 拖拽手势结束后不应触发控制栏的单击开关逻辑，否则调亮度/音量后控制栏会闪烁
-        const wasGesture = !!actionsRef.current.handleTouchEnd?.(e);
 
         if (!isDoubleTap && !stateRef.current.showSettings && !wasGesture) {
             // Delayed single-tap: toggle controls visibility (not play/pause)

@@ -69,6 +69,13 @@ export function useSettings(isOpen: boolean) {
         return true;
     };
 
+    // v0.9.x: 修改自定义源 (id 固定，更新可编辑字段)
+    const updateCustomSource = (id: string, patch: Partial<ResourceSite>): boolean => {
+        if (!customSources.some(s => s.id === id)) return false;
+        setCustomSources(prev => prev.map(s => s.id === id ? { ...s, ...patch, id } : s));
+        return true;
+    };
+
     // v0.9.31: 删除自定义源 (同时从禁用列表移除, 防止残留)
     const removeCustomSource = (id: string) => {
         setCustomSources(prev => prev.filter(s => s.id !== id));
@@ -111,6 +118,7 @@ export function useSettings(isOpen: boolean) {
             setCustomLocalUrl,
             toggleSource,
             addCustomSource,
+            updateCustomSource,
             removeCustomSource,
             importSources,
             setCustomSources

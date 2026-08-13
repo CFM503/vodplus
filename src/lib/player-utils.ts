@@ -1,4 +1,36 @@
 /**
+ * 播放进度缓存 Key。
+ * 带媒体扩展名的直链地址通常 query 是动态签名，去掉 query 以便跨会话恢复进度；
+ * 无扩展名/接口型地址（自定义源常见）query 可能标识具体流，保留 query 避免不同流共用同一 Key。
+ * 仅剔除明确的易变签名参数。
+ */
+const MEDIA_PATH_RE = /\.(m3u8|mp4|webm|flv|ts|mpd|mov|mkv)(?:[?#]|$)/i;
+const VOLATILE_PROGRESS_PARAMS = new Set([
+    'sign', 'signature', 'token', 'expires', 'expire', 'timestamp',
+    'nonce', 'rand', 'random', '_t', 'st', 'access_token', 'play_token',
+]);
+
+export function getProgressKey(videoUrl: string): string {
+    try {
+        const u = new URL(videoUrl);
+        if (MEDIA_PATH_RE.test(u.pathname)) {
+            return `VOD_PROGRESS_${u.origin}${u.pathname}`;
+        }
+
+        const params = new URLSearchParams(u.search);
+        for (const name of Array.from(params.keys())) {
+            if (VOLATILE_PROGRESS_PARAMS.has(name.toLowerCase())) {
+                params.delete(name);
+            }
+        }
+        const query = params.toString();
+        return `VOD_PROGRESS_${u.origin}${u.pathname}${query ? `?${query}` : ''}`;
+    } catch {
+        return `VOD_PROGRESS_${videoUrl}`;
+    }
+}
+
+/**
  * Format seconds into M:SS or H:MM:SS display format.
  */
 export function formatTime(seconds: number): string {

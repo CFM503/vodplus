@@ -9,7 +9,11 @@ export function normalizeVodResponse(data: any, source: ResourceSite, duration: 
         return { code: 500, msg: 'Error or Empty', page: 1, pagecount: 0, limit: 0, total: 0, list: [] };
     }
 
-    const movies: Movie[] = (data.list || data.data || []).map((m: any) => {
+    // 部分自定义源详情接口返回单对象而不是数组，统一转为数组处理
+    const rawList = data.list || data.data || [];
+    const items = Array.isArray(rawList) ? rawList : [rawList];
+
+    const movies: Movie[] = items.map((m: any) => {
         // 所有来源(JSON/XML/自定义)统一净化图片地址:
         // 被投毒采集站会在 pic 字段混入 #{if:...}{end if} 模板后门 / XSS payload,
         // 净化后脏数据不进入页面、接口、缓存;无效地址返回空串走占位图
@@ -20,10 +24,11 @@ export function normalizeVodResponse(data: any, source: ResourceSite, duration: 
             ? getProxyImage(rawPic, { width: CONFIG.IMAGE_THUMB_WIDTH, quality: CONFIG.IMAGE_THUMB_QUALITY })
             : getThemedPlaceholder(typeName, vodName);
 
-        // Clean up play_from (e.g., "feifan$$$ffm3u8" -> "非凡资源")
+        // 保留原始 vod_play_from (含 $$$ 线路名)，供 parseVodPlayGroups 正确拆分多线路。
+        // displaySource 单独用于页面展示，不覆盖原始字段。
         const rawPlayFrom = m.vod_play_from || '';
-        const cleanPlayFrom = rawPlayFrom.split('$$$')[0];
-        const displaySource = RESOURCE_SITES.find(s => s.id === cleanPlayFrom || s.name === cleanPlayFrom)?.name || source.name;
+        const firstPlayFrom = rawPlayFrom.split('$$$')[0];
+        const displaySource = RESOURCE_SITES.find(s => s.id === firstPlayFrom || s.name === firstPlayFrom)?.name || source.name;
 
         return {
             vod_id: m.vod_id || m.id,
@@ -37,8 +42,9 @@ export function normalizeVodResponse(data: any, source: ResourceSite, duration: 
             vod_director: m.vod_director || m.director,
             vod_content: m.vod_content || m.des || m.content,
             vod_play_url: m.vod_play_url,
-            vod_play_from: displaySource,
+            vod_play_from: rawPlayFrom || displaySource,
             source_id: source.id,
+            source_name: displaySource,
             latency: duration
         };
     });

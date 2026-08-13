@@ -97,7 +97,7 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
 
             if (nameHint) {
                 // Parallel Mode: Fetch TMDB details and VOD matching in parallel
-                const matchPromise = performRaceMatch(nameHint, disabledSources);
+                const matchPromise = performRaceMatch(nameHint, disabledSources, customSources);
                 const [tmdbResult, matchResult] = await Promise.all([tmdbPromise, matchPromise]);
                 data = tmdbResult;
                 bestEntry = matchResult.bestEntry;
@@ -108,7 +108,7 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
                 if (data) {
                     const name = data.title;
                     if (name) {
-                        const matchResult = await performRaceMatch(name, disabledSources);
+                        const matchResult = await performRaceMatch(name, disabledSources, customSources);
                         bestEntry = matchResult.bestEntry;
                         candidates = matchResult.candidates;
                     }
@@ -148,8 +148,12 @@ export async function getMovieDetail(sourceId: string, id: string, disabledSourc
     const res = await fetchFromSource(source, `${source.detailPath}${id}`);
     // v0.9.34: 部分 SeaCMS 站忽略 ids 参数, 详情接口返回整个最新列表 (如快看站)。
     // 若返回的是列表而非单条, 按 id 精确匹配, 避免详情页展示错误的影片。
-    const found = (res.list || []).find((m: any) => String(m.vod_id) === String(id));
-    return found || res.list[0] || null;
+    const list = res.list || [];
+    const found = list.find((m: any) => String(m.vod_id) === String(id));
+    if (found) return found;
+    // 兼容返回“单条但 id 字段不同”的场景；多条且无精确匹配时不再瞎取第一条 (可能是没有播放地址的列表项)
+    if (list.length === 1 && list[0]?.vod_play_url) return list[0];
+    return null;
 }
 
 const internalCachedGetMovieDetail = unstable_cache(
@@ -173,8 +177,9 @@ export const cachedGetMovieDetail = cache(async (sourceId: string, id: string, d
 import { isNameMatch } from '@/lib/nameMatch';
 export { isNameMatch };
 
-async function performRaceMatch(name: string, disabledSources: string[]) {
-    const activeSources = RESOURCE_SITES.filter(s => !disabledSources.includes(s.id));
+async function performRaceMatch(name: string, disabledSources: string[], customSources: ResourceSite[] = []) {
+    // v0.9.31: 自动匹配包含用户自定义源，避免详情页换源时丢失自定义线路
+    const activeSources = [...RESOURCE_SITES, ...customSources].filter(s => !disabledSources.includes(s.id));
     const candidates: any[] = [];
     const targetCount = CONFIG.MATCH_CANDIDATE_COUNT || 8;
 

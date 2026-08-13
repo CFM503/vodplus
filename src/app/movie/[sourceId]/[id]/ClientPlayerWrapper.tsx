@@ -64,6 +64,13 @@ export default function ClientPlayerWrapper({
 
     const gridRef = useRef<HTMLDivElement>(null);
 
+    // 自定义源 baseUrl 解析表，用于把相对播放地址解析为绝对地址
+    const customSources = useMemo(() => readCustomSourcesFromDocument(), []);
+    const getSourceBaseUrl = useCallback((sourceId: string) => {
+        const rawId = sourceId.split('-group-')[0];
+        return RESOURCE_SITES.find(s => s.id === rawId)?.baseUrl || customSources.find(s => s.id === rawId)?.baseUrl;
+    }, [customSources]);
+
     const currentEp = episodes[currentEpIndex];
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
@@ -198,7 +205,7 @@ export default function ClientPlayerWrapper({
         const lines: { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }[] = [];
 
         // 1. Expand current source groups
-        const currentGroups = parseVodPlayGroups(vodPlayUrl, vodPlayFrom);
+        const currentGroups = parseVodPlayGroups(vodPlayUrl, vodPlayFrom, getSourceBaseUrl(initialSourceId));
         currentGroups.forEach((g, idx) => {
             lines.push({
                 source_id: `${initialSourceId}-group-${idx}`,
@@ -214,7 +221,7 @@ export default function ClientPlayerWrapper({
             clientCandidates.forEach((c) => {
                 if (c.source_id === initialSourceId) return;
 
-                const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from);
+                const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from, getSourceBaseUrl(c.source_id));
                 cGroups.forEach((g, idx) => {
                     const cBaseName = c.source_name ? c.source_name.split('$$$')[0].trim() : '其他线路';
                     lines.push({
@@ -229,10 +236,11 @@ export default function ClientPlayerWrapper({
         }
 
         return lines;
-    }, [clientCandidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom]);
+    }, [clientCandidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom, getSourceBaseUrl]);
 
     const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
-        if (line.source_id === currentSourceId) return;        const nextEpisodes = parseVodPlayUrl(line.vod_play_url);
+        if (line.source_id === currentSourceId) return;
+        const nextEpisodes = parseVodPlayUrl(line.vod_play_url, getSourceBaseUrl(line.source_id));
         if (!nextEpisodes || nextEpisodes.length === 0) {
             alert('该线路暂无有效剧集');
             return;
@@ -285,7 +293,7 @@ export default function ClientPlayerWrapper({
         setEpisodes(nextEpisodes);
         setCurrentSourceId(line.source_id);
         setCurrentEpIndex(nextIndex);
-    }, [currentSourceId, episodes, currentEpIndex]);
+    }, [currentSourceId, episodes, currentEpIndex, getSourceBaseUrl]);
 
     // v0.9.25: 卡顿自动切换提示 (播放器内自带 toast, 这里额外提示切到了哪条线路)
     const showSwitchNotice = useCallback((msg: string) => {

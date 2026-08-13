@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CONFIG } from '@/config/config';
-import { formatTime } from '@/lib/player-utils';
+import { formatTime, getProgressKey } from '@/lib/player-utils';
+import { isEmbedUrl } from '@/lib/vodParser';
 import { useHlsSource } from '@/hooks/player/useHlsSource';
 import { useVideoEvents } from '@/hooks/player/useVideoEvents';
 import { useVideoSeek } from '@/hooks/player/useVideoSeek';
@@ -94,7 +95,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
     const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
-    const isEmbed = url ? (!url.includes('.m3u8') && !url.includes('.mp4') && !url.includes('.webm') && url.startsWith('http')) : false;
+    // 只有明确的 iframe/网页地址才走 embed；无扩展名 HLS 不再被误判为 iframe。
+    const isEmbed = isEmbedUrl(url);
 
     // Ref mirror of skipIntroTime for useHlsSource (which needs a ref for its effect closures)
     const skipIntroTimeRef = useRef(skipIntroTime);
@@ -155,7 +157,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     // ===========================
 
     // 1. HLS Source
-    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef });
+    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef, showToast });
 
     // 2. Settings
     const settings = useVideoSettings({
@@ -201,6 +203,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         hasPrefetchedNextRef: hlsSource.hasPrefetchedNextRef,
         onTimeUpdate,
         userPausedRef,
+        isSpeedHolding,
     });
 
     // 4. Gestures
@@ -313,15 +316,6 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         const video = videoRef.current;
         if (!video || hlsSource.isLoading || hasRestoredProgressRef.current) return;
 
-        const getProgressKey = (videoUrl: string) => {
-            try {
-                const parsed = new URL(videoUrl);
-                return `VOD_PROGRESS_${parsed.origin}${parsed.pathname}`;
-            } catch (e) {
-                return `VOD_PROGRESS_${videoUrl}`;
-            }
-        };
-
         const doRestore = () => {
             if (hasRestoredProgressRef.current) return;
             hasRestoredProgressRef.current = true;
@@ -384,7 +378,8 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
             // useMobileVideoTouch in VideoPlayer.tsx for YouTube-style behavior.
             // Do NOT call controls.handleVideoClick here.
         }
-        if (!isTap) {
+        // 手势结束时不要弹出控制栏，避免与手势 HUD / 后续单击开关冲突
+        if (!isTap && !wasGesture) {
             controls.setIsHovering(true);
         }
         return wasGesture;

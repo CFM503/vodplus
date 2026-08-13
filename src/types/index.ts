@@ -12,6 +12,7 @@ export interface Movie {
     vod_play_url?: string;
     vod_play_from?: string;
     source_id?: string;
+    source_name?: string;
     latency?: number; // API response time in milliseconds
     candidates?: {
         source_id: string;
