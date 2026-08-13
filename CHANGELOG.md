@@ -1,3 +1,11 @@
+# VODplus v0.9.38 - Library Source Selector Layout & Pagination Fix
+
+## Bug Fixes
+- **Library Source Selector Layout Broken With Many Sources**: The 片库 source selector used a raw `[...RESOURCE_SITES, ...customSources]` merge, so custom sources whose IDs collided with built-in stations appeared twice, and the wide horizontal-scroll row broke the page layout when many sources were imported. It now dedupes via `mergeSources` and wraps into a scrollable box.
+- **Pagination Missing Total Pages**: The library pagination now shows `第 1/总页数 页` (and `PAGE 1 / total`) instead of only the current page.
+
+---
+
 # VODplus v0.9.37 - Chunked Custom Source Cookie Storage
 
 ## Bug Fixes

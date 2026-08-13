@@ -1,7 +1,7 @@
 import { Header } from '@/components/Header';
 import { SearchResults } from '@/components/search/SearchResults';
 import { Sparkles } from 'lucide-react';
-import { RESOURCE_SITES } from '@/lib/resources';
+import { mergeSources } from '@/lib/sourceConfig';
 import { cookies } from 'next/headers';
 import { getUserPreferences } from '@/lib/preferences';
 
@@ -21,8 +21,8 @@ export default async function SearchPage({ searchParams }: PageProps) {
     const cookieStore = await cookies();
     const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
-    // Prepare active sources list for client (内置源 + 自定义源, 去掉禁用的)
-    const activeSources = [...RESOURCE_SITES, ...customSources]
+    // Prepare active sources list for client (内置源 + 自定义源去重, 去掉禁用的)
+    const activeSources = mergeSources(customSources)
         .filter(s => !disabledSources.includes(s.id))
         .map(s => ({ id: s.id, name: s.name }));
 

@@ -1,5 +1,5 @@
 import { Header } from '@/components/Header';
-import { RESOURCE_SITES } from '@/lib/resources';
+import { mergeSources } from '@/lib/sourceConfig';
 import { metadata } from '@/lib/metadata';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
@@ -27,8 +27,8 @@ export default async function LatestPage({ searchParams }: PageProps) {
     const cookieStore = await cookies();
     const { disabledSources, customLocalUrl, customSources } = await getUserPreferences(cookieStore);
 
-    // v0.9.31: 源选择器包含自定义源
-    const availableSources = [...RESOURCE_SITES, ...customSources].filter(s => !disabledSources.includes(s.id));
+    // v0.9.31: 源选择器包含自定义源 (与内置源 id 冲突的自定义源自动去重)
+    const availableSources = mergeSources(customSources).filter(s => !disabledSources.includes(s.id));
     const sourceId = source || metadata.id;
     const pageNum = parseInt(page || '1');
     const mediaType = type || 'movie';
@@ -64,7 +64,7 @@ export default async function LatestPage({ searchParams }: PageProps) {
                         )}
 
                         {/* Source Selector */}
-                        <div className="flex bg-slate-900/50 backdrop-blur-md rounded-xl p-1 border border-white/10 overflow-x-auto max-w-[calc(100vw-2rem)]">
+                        <div className="flex flex-wrap gap-1 bg-slate-900/50 backdrop-blur-md rounded-xl p-1 border border-white/10 max-w-full max-h-36 overflow-y-auto">
                             <Link
                                 href={`/latest?source=tmdb&page=1`}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${sourceId === 'tmdb' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}

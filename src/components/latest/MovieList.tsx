@@ -81,8 +81,8 @@ export function MovieList({ sourceId, pageNum, mediaType, initialData = null }: 
                 </button>
 
                 <div className="flex flex-col items-center">
-                    <span className="text-white font-mono font-bold text-lg">第 {page} 页</span>
-                    <span className="text-slate-500 text-[10px] uppercase tracking-widest mt-0.5">PAGE {page}</span>
+                    <span className="text-white font-mono font-bold text-lg">第 {page}/{maxPages} 页</span>
+                    <span className="text-slate-500 text-[10px] uppercase tracking-widest mt-0.5">PAGE {page} / {maxPages}</span>
                 </div>
 
                 <button
