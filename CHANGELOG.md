@@ -1,3 +1,17 @@
+# VODplus v0.9.39 - Direct-Stream Only Line Filtering
+
+## Features & Optimizations
+- **播放页只保留直链线路**: `vodParser.ts` 现在严格把可播地址限定为含 `.m3u8` / `.mp4` / `.webm` 的 http(s) 直链；云播 / 解析 / 跳转 / iframe 线路（如 `jsyun`、`hnyun`、`gsyun`、纯云播名）会从线路选择中剔除。详情页默认起播与线路组解析都优先选择 m3u8，其次是 mp4/webm。
+- **同站多线路合并**: `ClientPlayerWrapper` 按 `source_id` 去重，同一资源站只展示一条最优直链（优先名称或地址含 m3u8），不再出现「极速·jsyun / 极速·jsm3u8」这类成对按钮。
+- **移除 iframe 播放路径**: 播放器不再把非媒体 URL 渲染为 iframe；非直链地址会在切换时给出「该线路无可用直链，请换其它源」toast，避免 X-Frame-Options 黑屏。
+
+## Bug Fixes
+- **云播/解析线路混入线路选择**: 强化线路组过滤（关键词 + 组内直链可播比例 < 80% 即丢弃），某站只有云播组时整站不进入列表。
+- **切源静默失败**: 解析后剧集为空或全不可播时不再切换到 iframe embed，改为明确 toast 提示换线。
+- **FLV 等非直链静默失败**: `useHlsSource` 对非 m3u8/mp4/webm 地址统一给出 toast，不再静默或走 embed。
+
+---
+
 # VODplus v0.9.38 - Library Source Selector Layout & Pagination Fix
 
 ## Bug Fixes

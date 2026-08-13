@@ -1,11 +1,9 @@
 import { Episode, PlayGroup } from '@/types';
 
-// 已知流媒体扩展名。带扩展名时可直接判定为媒体地址，而不是 iframe/网页。
-const MEDIA_EXT_RE = /\.(m3u8|mp4|webm|flv|ts|mpd|mov|mkv|ogg|aac|mp3|m4a|m4v|m4s)(?:[?#]|$)/i;
-// 明确是网页/播放器页面的扩展名，不应交给 HLS.js。
-const PAGE_EXT_RE = /\.(html|htm|php|aspx|jsp|shtml)(?:[?#]|$)/i;
-// 明显的 iframe/嵌入地址特征。
-const EMBED_HINT_RE = /(\/embed\/|\biframe\b|player\.php|embed=true)/i;
+// 产品定位：仅支持直链流媒体。可播扩展名严格限定为 m3u8 / mp4 / webm。
+const DIRECT_EXT_RE = /\.(m3u8|mp4|webm)(?:[?#]|$)/i;
+// 云播/解析/跳转类线路关键词（忽略大小写；中文关键词按小写原文匹配）
+const CLOUD_LINE_KEYWORDS = ['yun', 'cloud', 'parse', '解析', '跳转', 'player', 'iframe', '共享', '云'];
 
 function trimUrl(url: string | undefined | null): string {
     return (url || '').trim();
@@ -15,32 +13,26 @@ function looksLikeUrl(raw: string): boolean {
     const u = raw.trim();
     if (!u) return false;
     if (/^(https?:\/\/|blob:|data:|\/\/|\/)/i.test(u)) return true;
-    return MEDIA_EXT_RE.test(u);
+    return DIRECT_EXT_RE.test(u);
 }
 
 /**
- * 判断是否为可直接交给播放器处理的媒体流地址。
- * 与旧实现不同：无扩展名的 http(s) 地址也视为可直接播放（HLS 常省略 .m3u8），
- * 只有明显的网页/iframe 地址才返回 false。
+ * 是否为可直接交给 HLS.js / 原生 video 播放的直链。
+ * 严格版：只有包含 .m3u8 / .mp4 / .webm 的地址才算可播；
+ * 纯 HTML 播放页、无扩展名解析接口、FLV 等一律视为不可播。
  */
 export function isDirectPlayableUrl(url: string | undefined | null): boolean {
     const u = trimUrl(url);
-    if (!u) return false;
-    if (/^(blob:|data:)/i.test(u)) return true;
-    if (u.startsWith('//') || u.startsWith('/')) return true;
-    if (!u.startsWith('http')) return MEDIA_EXT_RE.test(u);
-    if (PAGE_EXT_RE.test(u) || EMBED_HINT_RE.test(u)) return false;
-    return true;
+    return !!u && DIRECT_EXT_RE.test(u);
 }
 
 /**
- * 判断是否为 iframe/网页嵌入地址（需要 <iframe> 渲染）。
+ * 是否为云播/解析/跳转类线路名。
  */
-export function isEmbedUrl(url: string | undefined | null): boolean {
-    const u = trimUrl(url);
-    if (!/^https?:\/\//i.test(u)) return false;
-    if (MEDIA_EXT_RE.test(u)) return false;
-    return PAGE_EXT_RE.test(u) || EMBED_HINT_RE.test(u);
+export function isCloudLine(name: string | undefined | null): boolean {
+    const n = (name || '').toLowerCase();
+    if (!n) return false;
+    return CLOUD_LINE_KEYWORDS.some(k => n.includes(k));
 }
 
 /**
@@ -69,6 +61,17 @@ export function isDirectPlayableEpisodeList(episodes: Episode[]): boolean {
     return ok >= Math.ceil(episodes.length * 0.8);
 }
 
+/**
+ * 单个线路组是否可保留：
+ * 1) 名字是云播/解析类且名字本身不含 m3u8/mp4/webm → 丢弃
+ * 2) 组内直链可播比例低于 80% → 丢弃
+ */
+function isPlayableGroup(name: string | undefined, episodes: Episode[]): boolean {
+    if (episodes.length === 0) return false;
+    if (isCloudLine(name) && !DIRECT_EXT_RE.test(name || '')) return false;
+    return isDirectPlayableEpisodeList(episodes);
+}
+
 export function parseSinglePlaylist(playlist: string, baseUrl?: string | null): Episode[] {
     const cleanPlaylist = playlist.trim();
     if (!cleanPlaylist) return [];
@@ -95,40 +98,37 @@ export function parseSinglePlaylist(playlist: string, baseUrl?: string | null): 
     return episodes;
 }
 
+/**
+ * 详情页默认起播解析：只从严格直链可播的线路组中选，优先 m3u8，其次 mp4/webm。
+ * 没有可用直链时返回空数组，绝不选中云播/解析组。
+ */
 export function parseVodPlayUrl(url: string | undefined | null, baseUrl?: string | null): Episode[] {
     if (!url) return [];
     const rawUrl = url.trim();
     if (!rawUrl) return [];
 
     const playlists = rawUrl.split('$$$');
-    let bestPlaylist = '';
+    const candidates: { episodes: Episode[]; score: number }[] = [];
 
-    // 优先选择含 .m3u8 的线路；其次保留可直接播放的线路。
     for (const playlist of playlists) {
         const episodes = parseSinglePlaylist(playlist, baseUrl);
-        if (isDirectPlayableEpisodeList(episodes)) {
-            if (!bestPlaylist || playlist.toLowerCase().includes('.m3u8')) {
-                bestPlaylist = playlist;
-                if (playlist.toLowerCase().includes('.m3u8')) {
-                    break;
-                }
-            }
+        if (!isDirectPlayableEpisodeList(episodes)) continue;
+
+        const lower = playlist.toLowerCase();
+        const score = lower.includes('.m3u8') ? 2 : (lower.includes('.mp4') || lower.includes('.webm')) ? 1 : 0;
+        candidates.push({ episodes, score });
+    }
+
+    if (candidates.length === 0) {
+        // 单地址（无 $$$ / #）且严格可播
+        if (isDirectPlayableUrl(rawUrl) && !rawUrl.includes('$') && !rawUrl.includes('#')) {
+            return parseSinglePlaylist(rawUrl, baseUrl);
         }
+        return [];
     }
 
-    // 没有通过“可直接播放”校验的线路时，回退到含 .m3u8 的线路或第一条。
-    if (!bestPlaylist && playlists.length > 0) {
-        bestPlaylist = playlists.find(p => p.toLowerCase().includes('.m3u8')) || playlists[0];
-    }
-
-    const parsed = parseSinglePlaylist(bestPlaylist, baseUrl);
-
-    // 单地址（无 $$$ / #）直接返回
-    if (parsed.length === 0 && isDirectPlayableUrl(rawUrl) && !rawUrl.includes('$') && !rawUrl.includes('#')) {
-        parsed.push({ name: 'Play', url: resolvePlayUrl(rawUrl, baseUrl) });
-    }
-
-    return parsed;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].episodes;
 }
 
 export function parseVodPlayGroups(url: string | undefined | null, playFrom?: string | null, baseUrl?: string | null): PlayGroup[] {
@@ -153,15 +153,8 @@ export function parseVodPlayGroups(url: string | undefined | null, playFrom?: st
             name = `线路${index + 1}`;
         }
 
-        const lowerFrom = name.toLowerCase();
         const episodes = parseSinglePlaylist(cleanPlaylist, baseUrl);
-        if (episodes.length === 0) return;
-
-        // 老的线路名过滤规则：名字含 'yun' 且没有任何流媒体地址 → 视为网页/网盘线路丢弃。
-        // 注意：这里用 isDirectPlayableUrl 而不是简单判断扩展名，避免把无扩展名 HLS 误杀。
-        if (lowerFrom.includes('yun') && !episodes.some(e => isDirectPlayableUrl(e.url))) {
-            return;
-        }
+        if (!isPlayableGroup(name, episodes)) return;
 
         groups.push({
             id: `group-${index}`,

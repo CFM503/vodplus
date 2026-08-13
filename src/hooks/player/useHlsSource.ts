@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type Hls from 'hls.js';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
+import { isDirectPlayableUrl } from '@/lib/vodParser';
 
 // Cache the HLS constructor across URL changes to avoid re-importing
 let cachedHlsConstructor: typeof Hls | null = null;
@@ -69,6 +70,14 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
             if (!url) return;
             // 清理上一 URL 可能残留的原生 onerror，避免误报
             video.onerror = null;
+
+            // 非直链（云播/解析页/无扩展名接口）不进入 HLS，给出明确提示而不是黑屏
+            if (!isDirectPlayableUrl(url)) {
+                showToast?.('该播放地址不是直链（仅支持 m3u8/mp4/webm），请切换线路');
+                setIsLoading(false);
+                return;
+            }
+
             if (url.includes('.mp4') || url.includes('.webm')) {
                 video.src = url;
                 video.onerror = () => {
@@ -78,13 +87,6 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         showToast?.('视频加载失败：可能是不支持的格式、网络问题或 CORS 限制');
                     }
                 };
-                setIsLoading(false);
-                return;
-            }
-
-            // FLV 无法被 HLS.js / 原生 video 直接播放，给出明确提示
-            if (/\.flv(?:[?#]|$)/i.test(url)) {
-                showToast?.('该线路为 FLV 格式，暂不支持直接播放，请切换其他线路');
                 setIsLoading(false);
                 return;
             }

@@ -49,7 +49,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleMouseMove, handleTouchStart, handleTouchMove,
-        handleTouchEnd, handleTouchCancel, isEmbed, brightness, gestureHUD, toast, videoScale,
+        handleTouchEnd, handleTouchCancel, brightness, gestureHUD, toast, videoScale,
         isMuted, togglePlay, showSettings, setShowSettings,
         toggleFullscreen, handleSeekRelative,
     } = player;
@@ -116,7 +116,6 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     // 阻止 Android/Brave 长按视频弹出系统菜单（复制视频帧/画中画），
     // 并把触摸锁定在播放器手势上。原生非 passive 监听才能可靠 preventDefault。
     useEffect(() => {
-        if (isEmbed) return;
         const video = videoRef.current;
         if (!video) return;
 
@@ -125,7 +124,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
         };
         video.addEventListener('touchstart', lockTouch, { passive: false });
         return () => video.removeEventListener('touchstart', lockTouch);
-    }, [videoRef, isEmbed]);
+    }, [videoRef]);
 
     // 同样禁止视频/容器上的右键/长按上下文菜单
     const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -170,19 +169,6 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     const handleContainerTouchEnd = useCallback((e: React.TouchEvent) => {
         handleMobileTouchEnd(e);
     }, [handleMobileTouchEnd]);
-
-    if (isEmbed) {
-        return (
-            <div ref={containerRef} className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
-                <iframe
-                    src={url}
-                    className="w-full h-full border-none"
-                    allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                />
-            </div>
-        );
-    }
 
     return (
         <div

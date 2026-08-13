@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CONFIG } from '@/config/config';
 import { formatTime, getProgressKey } from '@/lib/player-utils';
-import { isEmbedUrl } from '@/lib/vodParser';
 import { useHlsSource } from '@/hooks/player/useHlsSource';
 import { useVideoEvents } from '@/hooks/player/useVideoEvents';
 import { useVideoSeek } from '@/hooks/player/useVideoSeek';
@@ -95,8 +94,9 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     const [isSpeedHolding, setIsSpeedHolding] = useState(false);
     const [toast, setToast] = useState<ToastState>({ message: '', visible: false });
 
-    // 只有明确的 iframe/网页地址才走 embed；无扩展名 HLS 不再被误判为 iframe。
-    const isEmbed = isEmbedUrl(url);
+    // 产品定位：仅支持直链流媒体，不再渲染 iframe embed。
+    // 非直链地址由 useHlsSource 给出明确 toast。
+    const isEmbed = false;
 
     // Ref mirror of skipIntroTime for useHlsSource (which needs a ref for its effect closures)
     const skipIntroTimeRef = useRef(skipIntroTime);

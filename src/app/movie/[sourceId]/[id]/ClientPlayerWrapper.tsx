@@ -47,7 +47,7 @@ export default function ClientPlayerWrapper({
     movieName?: string;
 }) {
     const [episodes, setEpisodes] = useState(initialEpisodes);
-    const [currentSourceId, setCurrentSourceId] = useState(() => `${initialSourceId}-group-0`);
+    const [currentSourceId, setCurrentSourceId] = useState(initialSourceId);
     const [currentEpIndex, setCurrentEpIndex] = useState(0);
     const [clientCandidates, setClientCandidates] = useState<NonNullable<Movie['candidates']>>(candidates || []);
     const [isMatching, setIsMatching] = useState(false);
@@ -200,49 +200,73 @@ export default function ClientPlayerWrapper({
         return initialSourceName.trim();
     }, [initialSourceName]);
 
-    // Expand current and client candidate lines into multi-line play groups
+    // Expand current and client candidate lines into per-source direct-playable lines.
+    // parseVodPlayGroups already drops cloud/parse/iframe groups; here dedupe to one best line per source_id.
     const allLines = useMemo(() => {
-        const lines: { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }[] = [];
+        const lineBySource = new Map<string, { source_id: string; source_name: string; vod_id: string; vod_play_url: string; vod_play_from: string }>();
 
-        // 1. Expand current source groups
+        const addLine = (sourceId: string, sourceName: string, vodId: string, playUrl: string, playFrom: string) => {
+            const existing = lineBySource.get(sourceId);
+            const candidateIsM3u8 = playUrl.toLowerCase().includes('.m3u8') || sourceName.toLowerCase().includes('.m3u8');
+
+            if (!existing) {
+                lineBySource.set(sourceId, { source_id: sourceId, source_name: sourceName, vod_id: vodId, vod_play_url: playUrl, vod_play_from: playFrom });
+                return;
+            }
+
+            const existingIsM3u8 = existing.vod_play_url.toLowerCase().includes('.m3u8') || existing.source_name.toLowerCase().includes('.m3u8');
+            // 同站多线路时优先保留 m3u8
+            if (candidateIsM3u8 && !existingIsM3u8) {
+                lineBySource.set(sourceId, { source_id: sourceId, source_name: sourceName, vod_id: vodId, vod_play_url: playUrl, vod_play_from: playFrom });
+            }
+        };
+
+        // 1. 当前源
         const currentGroups = parseVodPlayGroups(vodPlayUrl, vodPlayFrom, getSourceBaseUrl(initialSourceId));
-        currentGroups.forEach((g, idx) => {
-            lines.push({
-                source_id: `${initialSourceId}-group-${idx}`,
-                source_name: `${cleanInitialSourceName}${currentGroups.length > 1 ? ' · ' + g.name : ''}`,
-                vod_id: '',
-                vod_play_url: g.playUrl,
-                vod_play_from: cleanInitialSourceName
-            });
+        currentGroups.forEach(g => {
+            addLine(
+                initialSourceId,
+                `${cleanInitialSourceName}${currentGroups.length > 1 ? ' · ' + g.name : ''}`,
+                '',
+                g.playUrl,
+                cleanInitialSourceName
+            );
         });
 
-        // 2. Expand candidate groups
+        // 2. 候选源
         if (clientCandidates && clientCandidates.length > 0) {
             clientCandidates.forEach((c) => {
                 if (c.source_id === initialSourceId) return;
 
                 const cGroups = parseVodPlayGroups(c.vod_play_url, c.vod_play_from, getSourceBaseUrl(c.source_id));
-                cGroups.forEach((g, idx) => {
-                    const cBaseName = c.source_name ? c.source_name.split('$$$')[0].trim() : '其他线路';
-                    lines.push({
-                        source_id: `${c.source_id}-group-${idx}`,
-                        source_name: `${cBaseName}${cGroups.length > 1 ? ' · ' + g.name : ''}`,
-                        vod_id: c.vod_id,
-                        vod_play_url: g.playUrl,
-                        vod_play_from: c.vod_play_from || cBaseName
-                    });
+                const cBaseName = c.source_name ? c.source_name.split('$$$')[0].trim() : '其他线路';
+                cGroups.forEach(g => {
+                    addLine(
+                        c.source_id,
+                        `${cBaseName}${cGroups.length > 1 ? ' · ' + g.name : ''}`,
+                        c.vod_id,
+                        g.playUrl,
+                        c.vod_play_from || cBaseName
+                    );
                 });
             });
         }
 
-        return lines;
+        return Array.from(lineBySource.values());
     }, [clientCandidates, initialSourceId, cleanInitialSourceName, vodPlayUrl, vodPlayFrom, getSourceBaseUrl]);
+
+    // v0.9.25: 卡顿自动切换提示 (播放器内自带 toast, 这里额外提示切到了哪条线路)
+    const showSwitchNotice = useCallback((msg: string) => {
+        setSwitchNotice({ msg, key: Date.now() });
+        if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = setTimeout(() => setSwitchNotice(null), 3500);
+    }, []);
 
     const handleSwitchSource = useCallback((line: { source_id: string; source_name: string; vod_play_url: string }) => {
         if (line.source_id === currentSourceId) return;
         const nextEpisodes = parseVodPlayUrl(line.vod_play_url, getSourceBaseUrl(line.source_id));
         if (!nextEpisodes || nextEpisodes.length === 0) {
-            alert('该线路暂无有效剧集');
+            showSwitchNotice('该线路无可用直链，请换其它源');
             return;
         }
 
@@ -293,14 +317,7 @@ export default function ClientPlayerWrapper({
         setEpisodes(nextEpisodes);
         setCurrentSourceId(line.source_id);
         setCurrentEpIndex(nextIndex);
-    }, [currentSourceId, episodes, currentEpIndex, getSourceBaseUrl]);
-
-    // v0.9.25: 卡顿自动切换提示 (播放器内自带 toast, 这里额外提示切到了哪条线路)
-    const showSwitchNotice = useCallback((msg: string) => {
-        setSwitchNotice({ msg, key: Date.now() });
-        if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-        noticeTimerRef.current = setTimeout(() => setSwitchNotice(null), 3500);
-    }, []);
+    }, [currentSourceId, episodes, currentEpIndex, getSourceBaseUrl, showSwitchNotice]);
 
     // v0.9.25: 线路连续卡顿达到上限时, 自动切换到偏好表里更快/更稳的线路
     // 偏好顺序来自实测 CDN 速度 (见 CONFIG.LINE_PREFERENCE), 避免在当前慢线 (如量子 EU 节点) 上反复缓冲
