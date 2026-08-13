@@ -1,3 +1,15 @@
+# VODplus v0.9.36 - Android Fullscreen & Long-Press Fixes
+
+## Features & Optimizations
+- **Removed 6 Redundant Default Sources**: Dropped 金鹰资源, 速播资源, 虎牙资源, 豪华资源, 卧龙资源, 无尽资源 from the default station list, leaving a focused set of 7 lines.
+
+## Bug Fixes
+- **Android Fullscreen Black Screen**: Fixed the video rendering black when entering native fullscreen on Android Chrome/Brave. The `filter`/`transform` that were applied directly to the `<video>` element triggered a GPU compositing bug in fullscreen; they now live on a wrapper div and are omitted in the default (100% brightness / 1x scale) state.
+- **Long-Press Triggered System Context Menu**: Long-pressing the video (especially the right-side speed-hold zone) no longer pops the Android native media menu (copy video frame / picture-in-picture). Added native non-passive `touchstart` preventDefault plus `contextmenu` interception on both the container and video.
+- **Fullscreen Button Double Toggle**: The mobile fullscreen button no longer fires from both `touchend` and `click`, avoiding enter/exit races.
+
+---
+
 # VODplus v0.9.35 - Custom Source Playback & Mobile Gesture Fixes
 
 ## Features & Optimizations
