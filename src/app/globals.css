@@ -50,6 +50,16 @@
   }
 }
 
+/* 播放器容器进入原生全屏时强制铺满视口：
+   否则 aspect-video 会在竖屏手机上保持 16:9 高度，留下大面积黑边。 */
+.player-fullscreen:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  overflow: hidden;
+}
+
 /* Premium shimmer animation for skeletal loading */
 @keyframes shimmer-anim {
   0% {

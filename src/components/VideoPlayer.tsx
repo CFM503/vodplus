@@ -113,6 +113,25 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
 
     const handleCloseSettings = useCallback(() => setShowSettings(false), [setShowSettings]);
 
+    // 阻止 Android/Brave 长按视频弹出系统菜单（复制视频帧/画中画），
+    // 并把触摸锁定在播放器手势上。原生非 passive 监听才能可靠 preventDefault。
+    useEffect(() => {
+        if (isEmbed) return;
+        const video = videoRef.current;
+        if (!video) return;
+
+        const lockTouch = (e: TouchEvent) => {
+            if (e.cancelable) e.preventDefault();
+        };
+        video.addEventListener('touchstart', lockTouch, { passive: false });
+        return () => video.removeEventListener('touchstart', lockTouch);
+    }, [videoRef, isEmbed]);
+
+    // 同样禁止视频/容器上的右键/长按上下文菜单
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+    }, []);
+
     // 移动端面板触摸活动追踪（重置自动关闭计时器）
     useEffect(() => {
         const el = mobileSettingsPanelRef.current;
@@ -169,7 +188,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
         <div
             ref={containerRef}
             className={cn(
-                "relative w-full aspect-video bg-black select-none group rounded-xl",
+                "relative w-full aspect-video bg-black select-none group rounded-xl player-fullscreen",
                 !isHovering && isPlaying && "cursor-none",
                 showSettings ? "overflow-visible" : "overflow-hidden"
             )}
@@ -178,7 +197,9 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                 overscrollBehavior: 'none',
                 WebkitUserSelect: 'none',
                 WebkitTapHighlightColor: 'transparent',
+                WebkitTouchCallout: 'none',
             }}
+            onContextMenu={handleContextMenu}
             onMouseEnter={handlePCMouseEnter}
             onMouseLeave={handlePCMouseLeave}
             onMouseMove={handlePCMouseMove}
@@ -197,6 +218,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                 playsInline
                 preload="auto"
                 muted={isMuted}
+                onContextMenu={handleContextMenu}
                 // touchAction: 'none' 是移动端亮度/音量手势的关键：
                 // 不设置的话，浏览器会把垂直拖动当作页面滚动并触发 touchcancel，
                 // 手势在达到 GESTURE_VERTICAL_THRESHOLD 之前就会被系统打断（进度条正是靠 touchAction none 才能拖动）

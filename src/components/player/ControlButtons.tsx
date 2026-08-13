@@ -35,12 +35,6 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         toggleWebFullscreen();
     }, [toggleWebFullscreen]);
 
-    const handleFullscreenTouchEnd = useCallback((e: React.TouchEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        toggleFullscreen();
-    }, [toggleFullscreen]);
-
     const handleFullscreenClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         toggleFullscreen();
@@ -86,7 +80,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
             {/* Fullscreen */}
             <button
                 onTouchStart={stopPropagation}
-                onTouchEnd={handleFullscreenTouchEnd}
+                onTouchEnd={stopPropagation}
                 onClick={handleFullscreenClick}
                 className={cn(btnClass, "shrink-0")}
                 title="全屏"

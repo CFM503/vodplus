@@ -69,8 +69,19 @@ export function useVideoControls({
     const toggleFullscreen = useCallback(() => {
         const container = containerRef.current;
         if (!container) return;
-        if (!document.fullscreenElement) container.requestFullscreen();
-        else document.exitFullscreen();
+
+        if (document.fullscreenElement) {
+            const exit = document.exitFullscreen?.();
+            if (exit && typeof exit.catch === 'function') {
+                exit.catch(() => { /* 忽略退出全屏失败 */ });
+            }
+            return;
+        }
+
+        const request = container.requestFullscreen?.();
+        if (request && typeof request.catch === 'function') {
+            request.catch(() => { /* 忽略：用户手势/浏览器权限等原因导致全屏被拒绝 */ });
+        }
     }, [containerRef]);
 
     const toggleWebFullscreen = useCallback(() => {
