@@ -1,4 +1,5 @@
 import { ResourceSite, RESOURCE_SITES } from './resources';
+import { setCookie, deleteCookie } from './utils';
 
 /**
  * v0.9.31: 资源站列表导入/导出 + 自定义源支持
@@ -9,6 +10,9 @@ import { ResourceSite, RESOURCE_SITES } from './resources';
  */
 
 export const CUSTOM_SOURCES_COOKIE = 'VOD_CUSTOM_SOURCES';
+const COOKIE_CHUNK_PREFIX = 'VOD_CUSTOM_SOURCES_';
+// 浏览器单条 Cookie 上限约 4KB，分片留出安全余量
+const COOKIE_CHUNK_MAX_BYTES = 3500;
 export const EXPORT_APP = 'vodplus';
 export const EXPORT_VERSION = 1;
 
@@ -55,19 +59,94 @@ export function parseCustomSources(raw: string | null | undefined): ResourceSite
     }
 }
 
-// 客户端读取自定义源 (直接读 document.cookie)
+// 客户端读取自定义源 (直接读 document.cookie，合并所有分片)
 export function readCustomSourcesFromDocument(): ResourceSite[] {
     if (typeof document === 'undefined') return [];
-    const m = document.cookie
-        .split(';')
-        .map(s => s.trim())
-        .find(s => s.startsWith(`${CUSTOM_SOURCES_COOKIE}=`));
-    if (!m) return [];
-    try {
-        return parseCustomSources(decodeURIComponent(m.slice(CUSTOM_SOURCES_COOKIE.length + 1)));
-    } catch {
-        return [];
+    const cookies = document.cookie.split(';').map(s => s.trim());
+    const parts: (string | undefined)[] = [];
+
+    for (const c of cookies) {
+        const idx = c.indexOf('=');
+        if (idx < 0) continue;
+        const name = c.slice(0, idx).trim();
+        const rawValue = c.slice(idx + 1).trim();
+        let value = rawValue;
+        try {
+            value = decodeURIComponent(rawValue);
+        } catch {
+            // 分片无法解码时跳过，交给 JSON 解析兜底
+        }
+        collectCustomSourceChunk(name, value, parts);
     }
+
+    return parseCustomSources(parts.filter(Boolean).join(''));
+}
+
+// 服务端读取自定义源（cookieStore 已自动 decode，值就是原始分片）
+export function readCustomSourcesFromCookieStore(cookieStore: {
+    getAll?: () => { name: string; value: string }[];
+    get?: (name: string) => { value: string } | undefined;
+}): ResourceSite[] {
+    const parts: (string | undefined)[] = [];
+
+    if (typeof cookieStore.getAll === 'function') {
+        for (const c of cookieStore.getAll()) {
+            collectCustomSourceChunk(c.name, c.value, parts);
+        }
+    } else if (typeof cookieStore.get === 'function') {
+        const c = cookieStore.get(CUSTOM_SOURCES_COOKIE);
+        if (c) collectCustomSourceChunk(CUSTOM_SOURCES_COOKIE, c.value, parts);
+    }
+
+    return parseCustomSources(parts.filter(Boolean).join(''));
+}
+
+// 客户端写入自定义源：按 URL-encode 后的字节数分片写入多个 Cookie
+export function saveCustomSourcesToCookies(sources: ResourceSite[]): void {
+    if (typeof document === 'undefined') return;
+
+    const json = JSON.stringify(sources);
+    const chunks = splitByEncodedSize(json, COOKIE_CHUNK_MAX_BYTES);
+
+    // 清除旧分片，避免残留造成重复
+    for (let i = 2; i <= 64; i++) {
+        deleteCookie(`${COOKIE_CHUNK_PREFIX}${i}`);
+    }
+
+    chunks.forEach((chunk, index) => {
+        const name = index === 0 ? CUSTOM_SOURCES_COOKIE : `${COOKIE_CHUNK_PREFIX}${index + 1}`;
+        setCookie(name, chunk);
+    });
+}
+
+function collectCustomSourceChunk(name: string, value: string, parts: (string | undefined)[]): void {
+    if (name === CUSTOM_SOURCES_COOKIE) {
+        parts[0] = value;
+        return;
+    }
+    if (name.startsWith(COOKIE_CHUNK_PREFIX)) {
+        const n = parseInt(name.slice(COOKIE_CHUNK_PREFIX.length), 10);
+        if (Number.isInteger(n) && n >= 2) {
+            parts[n - 1] = value;
+        }
+    }
+}
+
+function splitByEncodedSize(json: string, maxBytes: number): string[] {
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const ch of json) {
+        const candidate = current + ch;
+        if (current.length > 0 && encodeURIComponent(candidate).length > maxBytes) {
+            chunks.push(current);
+            current = ch;
+        } else {
+            current = candidate;
+        }
+    }
+    if (current) chunks.push(current);
+    return chunks;
 }
 
 // 合并 内置源 + 自定义源 (自定义源 id 不得与内置源冲突)

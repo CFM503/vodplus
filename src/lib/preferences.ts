@@ -1,7 +1,7 @@
 import { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 import { logger } from './logger';
 import { ResourceSite } from './resources';
-import { CUSTOM_SOURCES_COOKIE, parseCustomSources } from './sourceConfig';
+import { readCustomSourcesFromCookieStore } from './sourceConfig';
 
 interface UserPreferences {
     disabledSources: string[];
@@ -36,7 +36,7 @@ export async function getUserPreferences(cookieStore: ReadonlyRequestCookies): P
     const customLocalUrl = cookieStore.get('VOD_CUSTOM_LOCAL_URL')?.value || '';
 
     // 4. Get Custom Sources (v0.9.31)
-    const customSources = parseCustomSources(cookieStore.get(CUSTOM_SOURCES_COOKIE)?.value);
+    const customSources = readCustomSourcesFromCookieStore(cookieStore);
 
     return {
         disabledSources,

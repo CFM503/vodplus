@@ -1,3 +1,10 @@
+# VODplus v0.9.37 - Chunked Custom Source Cookie Storage
+
+## Bug Fixes
+- **Large Custom Source Import Failed to Persist**: Importing a source list with many custom sources (e.g. 50+) appeared to succeed but was silently dropped because the serialized `VOD_CUSTOM_SOURCES` cookie exceeded the browser's ~4KB per-cookie limit. Custom sources are now split across multiple `VOD_CUSTOM_SOURCES` / `VOD_CUSTOM_SOURCES_2/3/...` cookies (≤3500 bytes each) on save, and reassembled on both client and server reads. Backward compatible with the previous single-cookie format.
+
+---
+
 # VODplus v0.9.36 - Android Fullscreen & Long-Press Fixes
 
 ## Features & Optimizations

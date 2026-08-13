@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCookie, setCookie } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { ResourceSite } from '@/lib/resources';
-import { CUSTOM_SOURCES_COOKIE } from '@/lib/sourceConfig';
+import { readCustomSourcesFromDocument, saveCustomSourcesToCookies } from '@/lib/sourceConfig';
 
 interface Settings {
     disabledSources: string[];
@@ -34,15 +34,8 @@ export function useSettings(isOpen: boolean) {
                 }
             }
 
-            const savedCustom = getCookie(CUSTOM_SOURCES_COOKIE);
-            if (savedCustom) {
-                try {
-                    const parsed = JSON.parse(savedCustom);
-                    if (Array.isArray(parsed)) setCustomSources(parsed);
-                } catch (e: unknown) {
-                    logger.error('Settings', 'Failed to parse custom sources', e);
-                }
-            }
+            const parsedCustom = readCustomSourcesFromDocument();
+            if (parsedCustom.length > 0) setCustomSources(parsedCustom);
 
             const savedMovie = getCookie('VOD_MOVIE_SOURCE');
             const savedTv = getCookie('VOD_TV_SOURCE');
@@ -91,7 +84,7 @@ export function useSettings(isOpen: boolean) {
     const saveSettings = () => {
         try {
             setCookie('VOD_DISABLED_SOURCES_V2', JSON.stringify(disabledSources));
-            setCookie(CUSTOM_SOURCES_COOKIE, JSON.stringify(customSources));
+            saveCustomSourcesToCookies(customSources);
             setCookie('VOD_MOVIE_SOURCE', movieSource);
             setCookie('VOD_TV_SOURCE', tvSource);
             setCookie('VOD_CUSTOM_LOCAL_URL', customLocalUrl);
