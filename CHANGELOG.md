@@ -1,3 +1,10 @@
+# VODplus v0.9.44 - Mobile Fullscreen Button Touch Event & Click Deduplication
+
+## Bug Fixes
+- **全屏按钮触屏直接响应与去重**: 将全屏按钮升级为 `onTouchEnd` 直接执行（`preventDefault` + `stopPropagation` + `toggleFullscreen`），消除 Android WebView / 移动端合成 click 丢失导致的点击无效问题；引入 500ms 触控时间戳去重机制，杜绝 touch 与合成 click 双重触发导致的全屏瞬间打开又退出。
+
+---
+
 # VODplus v0.9.43 - Mobile Tap & Touch Gesture State Machine Fix
 
 ## Bug Fixes

@@ -25,6 +25,8 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         ? "p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all shrink-0"
         : "p-1 hover:scale-110 transition-transform hover:text-indigo-400";
 
+    const lastTouchTimeRef = React.useRef(0);
+
     const handleSettingsClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -36,8 +38,18 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         toggleWebFullscreen();
     }, [toggleWebFullscreen]);
 
+    const handleFullscreenTouchEnd = useCallback((e: React.TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        lastTouchTimeRef.current = Date.now();
+        toggleFullscreen();
+    }, [toggleFullscreen]);
+
     const handleFullscreenClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (Date.now() - lastTouchTimeRef.current < 500) {
+            return;
+        }
         toggleFullscreen();
     }, [toggleFullscreen]);
 
@@ -81,7 +93,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
             {/* Fullscreen */}
             <button
                 onTouchStart={stopPropagation}
-                onTouchEnd={stopPropagation}
+                onTouchEnd={handleFullscreenTouchEnd}
                 onClick={handleFullscreenClick}
                 className={cn(btnClass, "shrink-0")}
                 title={isFullscreen ? "退出全屏" : "全屏"}
