@@ -89,28 +89,27 @@ export const CONFIG = {
 
     // 默认起播缓冲长度 (秒)
     // 降低此值可加快起播速度，HLS.js 会在播放中自动继续缓冲更多。
-    // 建议: 10 (快速起播) ~ 30 (抗卡顿)
+    // 建议: 15 (快速起播) ~ 45 (晚高峰抗卡顿)
     DEFAULT_BUFFER_LENGTH: 20,
-    // 网络自适应缓冲配置
+    // 网络自适应缓冲配置 (晚高峰网络抖动时动态扩展至 45s 抗抖动缓冲)
     BUFFER_ADAPTIVE: true,
-    BUFFER_LOW_BW: 8,
-    BUFFER_HIGH_BW: 30,
-    // HLS 分片拉取最大重试超时 (毫秒)
-    HLS_FRAGMENT_TRY_TIMEOUT: 10000,
-
+    BUFFER_LOW_BW: 10,
+    BUFFER_HIGH_BW: 45,
+    // HLS 分片拉取最大重试超时 (毫秒，8000ms 快速超时并退避重试，防范卡死)
+    HLS_FRAGMENT_TRY_TIMEOUT: 8000,
 
     // HLS 清单/层级加载超时时间 (毫秒)
-    HLS_TIMEOUT: 6000,
+    HLS_TIMEOUT: 5000,
 
     // 播放卡死检测阈值 (毫秒)
-    // waiting 状态持续超过此时间，触发跳过恢复 (调整为 3000ms 快速响应恢复)
+    // waiting 状态持续超过此时间，触发跳过恢复 (3000ms 快速响应恢复)
     STALL_THRESHOLD_MS: 3000,
 
     // 卡死时跳过秒数
     STALL_SKIP_SECONDS: 5,
 
     // 最大连续跳过次数，超过后提示用户切换线路
-    MAX_STALL_SKIPS: 5,
+    MAX_STALL_SKIPS: 4,
 
     // 线路自动切换 (v0.9.25):
     // 当前线路反复卡顿 (达到 MAX_STALL_SKIPS) 时, 自动切换到偏好列表里更快的线路, 而不是只弹提示

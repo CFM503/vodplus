@@ -1,3 +1,13 @@
+# VODplus v0.9.41 - High-Concurrency Streaming & Peak-Hour Playback Optimization
+
+## Architecture & Streaming Optimizations
+- **晚高峰流媒体自适应缓冲扩容**: 优化 HLS.js 缓冲与调度算法，将晚高峰网络抖动最大缓冲长度从 30s 阶梯扩容至 45s (`BUFFER_HIGH_BW: 45`)，采用 80% 安全带宽估算 (`abrBandWidthFactor: 0.8`) 与 `abrMaxWithRealBitrate: true`，避免晚高峰网络波动盲目拉取超高码率分片致使缓冲区耗尽。
+- **HLS 分片快速重试与渐进式解码**: 启用 `progressive: true` 和分片预拉取 (`startFragPrefetch: true`)，将分片超时阈值优化至 8000ms 并加入动态退避重试 (`fragLoadingRetryDelay: 800ms`)，避免慢速分片长时间挂起阻塞管线。
+- **API 边缘缓存与源站防打垮**: 为 `/api/vod/detail`, `/api/vod/latest`, `/api/vod/search` 等接口配置 `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600` 缓存头，大幅减轻晚高峰并发对上游 CMS 资源站接口的请求冲击。
+- **生产级 Nginx 流媒体反代与切片缓存配置**: 新增 [`deploy/nginx/vod_stream.conf`](file:///d:/SOFT/ai/github/vodplus/deploy/nginx/vod_stream.conf)，包含零拷贝 I/O 调优 (`sendfile` + `tcp_nopush` + `tcp_nodelay`)、HLS `.ts` 30天持久缓存与防击穿缓存锁 (`proxy_cache_lock on`)、MP4 1MB 自动切片代理 (`slice 1m`) 以及 API 边缘缓存。
+
+---
+
 # VODplus v0.9.40 - Mobile Touch & Android WebView Compatibility Enhancement
 
 ## Features & Optimizations

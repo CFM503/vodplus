@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
         const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
         const movie = await cachedGetMovieDetail(source, id, disabledSources, name, customSources);
-        return NextResponse.json({ code: 1, msg: 'OK', data: movie });
+        return NextResponse.json(
+            { code: 1, msg: 'OK', data: movie },
+            { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' } }
+        );
     } catch (error) {
         logger.error('DetailAPI', 'Error fetching detail:', error);
         return NextResponse.json(

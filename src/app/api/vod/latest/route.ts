@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
 
     try {
         const data = await getRecentMovies(source, page, type, disabledSources, customLocalUrl, customSources);
-        return NextResponse.json(data);
+        return NextResponse.json(
+            data,
+            { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' } }
+        );
     } catch (error) {
         logger.error('LatestAPI', 'Error:', error);
         return NextResponse.json(

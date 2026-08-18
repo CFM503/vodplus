@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        return NextResponse.json({ list });
+        return NextResponse.json(
+            { list },
+            { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' } }
+        );
     } catch (error) {
         logger.error('SearchAPI', `Error (${sourceId}):`, error);
         return NextResponse.json({ list: [] });

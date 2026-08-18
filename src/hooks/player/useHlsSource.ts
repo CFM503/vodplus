@@ -110,7 +110,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         maxBufferLength: CONFIG.BUFFER_ADAPTIVE ? Math.min(maxBufferLength, CONFIG.BUFFER_HIGH_BW) : maxBufferLength,
                         maxMaxBufferLength: maxBufferLength * 2,
                         maxBufferSize: initialBoundedSize,
-                        backBufferLength: 90,
+                        backBufferLength: 60,
                         lowLatencyMode: false,
                         manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         manifestLoadingMaxRetry: 4,
@@ -118,20 +118,25 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
                         levelLoadingMaxRetry: 4,
                         levelLoadingRetryDelay: 500,
-                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 10000,
+                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 8000,
                         fragLoadingMaxRetry: 6,
-                        fragLoadingRetryDelay: 1000,
+                        fragLoadingRetryDelay: 800,
                         startFragPrefetch: true,
-                        maxBufferHole: 0.8,
+                        progressive: true,
+                        maxBufferHole: 0.5,
                         highBufferWatchdogPeriod: 2.0,
                         testBandwidth: false,
-                        // 保守的初始带宽预估值 (1 Mbps)，防止起播阶段拉取超大分片导致起播慢
-                        abrEwmaDefaultEstimate: 1000000,
-                        // 加快 VoD 场景下带宽感知的灵敏度
-                        abrEwmaFastVoD: 1.0,
-                        abrEwmaSlowVoD: 5.0,
-                        // ABR 码率保守系数，保障起播与切换稳定性
-                        abrBandWidthFactor: 0.9,
+                        // 晚高峰 ABR 灵敏度与保守系数优化：
+                        // 初始预估 1.2 Mbps，防止起播拉取超大分片导致首屏过慢
+                        abrEwmaDefaultEstimate: 1200000,
+                        // 加快带宽下降感知，延迟带宽上升判定，防范晚高峰网络抖动造成的反复缓冲
+                        abrEwmaFastVoD: 1.5,
+                        abrEwmaSlowVoD: 4.0,
+                        // 80% 安全带宽估算，为网络抖动预留安全余量
+                        abrBandWidthFactor: 0.8,
+                        abrMaxWithRealBitrate: true,
+                        maxStarvationDelay: 4,
+                        appendErrorMaxRetry: 4,
                         xhrSetup: function (xhr: XMLHttpRequest) {
                             xhr.withCredentials = false;
                         },
