@@ -12,7 +12,7 @@ interface EpisodeControlsProps {
 const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode, variant = 'desktop' }: EpisodeControlsProps) {
     if (!onPrevEpisode && !onNextEpisode) return null;
 
-    const iconSize = variant === 'mobile' ? "w-5 h-5" : "w-6 h-6";
+    const iconSize = variant === 'mobile' ? "w-4 h-4" : "w-6 h-6";
 
     const stopPropagation = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
 
@@ -28,7 +28,7 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
 
     return (
         <div
-            className={cn("flex items-center gap-1", variant === 'desktop' ? "gap-2" : "gap-0.5")}
+            className={cn("flex items-center", variant === 'desktop' ? "gap-2" : "gap-0.5")}
             onClick={stopPropagation}
         >
             <button
@@ -37,8 +37,8 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
                 onClick={handlePrevClick}
                 disabled={!hasPrevEpisode}
                 className={cn(
-                    "p-1 transition-all active:scale-90 disabled:opacity-20 shrink-0",
-                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full"
+                    "transition-all active:scale-90 disabled:opacity-20 shrink-0",
+                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-1.5 hover:bg-white/10 rounded-full"
                 )}
                 title="上一集"
             >
@@ -52,8 +52,8 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
                 onClick={handleNextClick}
                 disabled={!hasNextEpisode}
                 className={cn(
-                    "p-1 transition-all active:scale-90 disabled:opacity-20 shrink-0",
-                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full"
+                    "transition-all active:scale-90 disabled:opacity-20 shrink-0",
+                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-1.5 hover:bg-white/10 rounded-full"
                 )}
                 title="下一集"
             >

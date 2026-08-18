@@ -22,7 +22,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
 
     const iconClass = variant === 'mobile' ? "w-5 h-5 text-white" : "w-6 h-6 text-white";
     const btnClass = variant === 'mobile'
-        ? "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all"
+        ? "p-1.5 rounded-full hover:bg-white/10 active:scale-95 transition-all shrink-0"
         : "p-1 hover:scale-110 transition-transform hover:text-indigo-400";
 
     const handleSettingsClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {

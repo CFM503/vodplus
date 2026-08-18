@@ -1,3 +1,10 @@
+# VODplus v0.9.42 - Mobile Control Bar Layout & Responsive Fix
+
+## Bug Fixes
+- **手机端控制栏按钮溢出修复**: 优化移动端播放控制栏的 flex 弹性布局与内边距，左侧控制组（播放/切集/静音/时间）采用 `flex-1 min-w-0` 与文本自适应截断，右侧控制组（设置/全屏）固定右对齐，精简移动端触控内边距，彻底解决手机竖屏及窄屏容器下控制按钮被挤压出屏幕或无法正常显示的问题。
+
+---
+
 # VODplus v0.9.41 - High-Concurrency Streaming & Peak-Hour Playback Optimization
 
 ## Architecture & Streaming Optimizations

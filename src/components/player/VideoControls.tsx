@@ -82,19 +82,19 @@ const VideoControls = React.memo(function VideoControls({
                 onTouchEnd={(e) => e.stopPropagation()}
             >
                 {/* Mobile layout */}
-                <div className="flex md:hidden flex-col p-2 pb-3 gap-0.5">
-                    <div className="px-1">
+                <div className="flex md:hidden flex-col px-2 pb-2.5 pt-1 gap-1">
+                    <div className="px-0.5">
                         <VideoProgressBar player={player} url={url} variant="mobile" />
                     </div>
-                    <div className="flex items-center justify-between text-white gap-1 h-10">
-                        <div className="flex items-center gap-1 shrink-0 min-w-0">
+                    <div className="flex items-center justify-between text-white gap-1 h-9">
+                        <div className="flex items-center gap-0.5 sm:gap-1 min-w-0 flex-1 overflow-hidden">
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
                                 onTouchEnd={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
+                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                             >
-                                {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
+                                {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
                             </button>
 
                             <EpisodeControls
@@ -109,18 +109,18 @@ const VideoControls = React.memo(function VideoControls({
                                 onTouchStart={(e) => e.stopPropagation()}
                                 onTouchEnd={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                                className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
+                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                                 title={isMuted ? "取消静音" : "静音"}
                             >
-                                {isMuted ? <VolumeX className="w-5 h-5 text-indigo-400" /> : <Volume2 className="w-5 h-5 text-white" />}
+                                {isMuted ? <VolumeX className="w-4 h-4 text-indigo-400" /> : <Volume2 className="w-4 h-4 text-white" />}
                             </button>
 
-                            <span className="text-[10px] font-mono whitespace-nowrap opacity-80 ml-1 shrink-0">
+                            <span className="text-[10px] sm:text-xs font-mono whitespace-nowrap opacity-80 ml-1 shrink min-w-0 truncate">
                                 {formatTime(duration * (progress / 100))} / {formatTime(duration)}
                             </span>
                         </div>
 
-                        <div className="flex items-center shrink-0">
+                        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-auto">
                             <ControlButtons player={player} variant="mobile" onSettingsToggle={onSettingsToggle} />
                         </div>
                     </div>
