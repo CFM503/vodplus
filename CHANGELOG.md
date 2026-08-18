@@ -1,3 +1,10 @@
+# VODplus v0.9.45 - Experimental Fullscreen navigationUI Option & Fallback
+
+## Optimizations
+- **全屏调用兼容性增强**: 在 `toggleFullscreen` 调用 `requestFullscreen` 时尝试传递 `{ navigationUI: 'hide' }` 参数（在支持的 PWA 安装场景及特定嵌入式容器下尝试隐藏导航条 UI），同时为老旧浏览器与非标准引擎保留无参安全降级。注：在普通非安装状态的移动端 Chrome/Brave 下，受 Android 沉浸模式安全策略限制，系统退出提示条由系统强制展示，该参数大概率不会产生可感知效果。
+
+---
+
 # VODplus v0.9.44 - Mobile Fullscreen Button Touch Event & Click Deduplication
 
 ## Bug Fixes

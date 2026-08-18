@@ -154,7 +154,14 @@ export function useVideoControls({
 
         if (request) {
             try {
-                const p = request.call(el);
+                // 尝试传入 { navigationUI: 'hide' } 请求隐藏系统导航UI（在 PWA / 兼容内核下有效），并对旧引擎做无参降级
+                let p: Promise<void> | undefined;
+                try {
+                    p = request.call(el, { navigationUI: 'hide' });
+                } catch {
+                    p = request.call(el);
+                }
+
                 if (p && typeof p.then === 'function') {
                     p.catch((_err: unknown) => {
                         // 当 Android WebView 宿主未实现 onShowCustomView 时，requestFullscreen 会 reject
