@@ -74,8 +74,8 @@ export interface PlayerControlActions {
     handleMouseMove?: (e: React.MouseEvent) => void;
     handleTouchStart?: (e: React.TouchEvent) => void;
     handleTouchMove?: (e: React.TouchEvent) => void;
-    // 返回 true 表示本次触摸是拖拽手势（亮度/音量/长按等），不应触发控制栏单击开关
-    handleTouchEnd?: (e: React.TouchEvent) => boolean | void;
+    // 返回手势与轻触判定结果：wasGesture 表示拖拽手势，isTap 表示有效轻触
+    handleTouchEnd?: (e: React.TouchEvent) => { isTap: boolean; wasGesture: boolean } | boolean | void;
 }
 
 // ===========================
@@ -336,8 +336,10 @@ export function useMobileVideoTouch(
         // 记录本次触摸结束时间，供下次双击检测使用
         refs.lastTapRef.current = now;
 
-        // 先交由手势处理器判定本次触摸是否为拖拽手势（亮度/音量/seek/长按倍速）
-        const wasGesture = !!actionsRef.current.handleTouchEnd?.(e);
+        // 先交由手势处理器判定本次触摸结果（是否为 isTap / 是否为 wasGesture 拖拽手势）
+        const touchRes = actionsRef.current.handleTouchEnd?.(e);
+        const isTap = typeof touchRes === 'object' && touchRes !== null ? touchRes.isTap : false;
+        const wasGesture = typeof touchRes === 'object' && touchRes !== null ? touchRes.wasGesture : !!touchRes;
 
         const shouldDoubleTap = isDoubleTap && pendingDoubleTapRef.current && !wasGesture && !stateRef.current.showSettings;
         pendingDoubleTapRef.current = false;
@@ -367,7 +369,8 @@ export function useMobileVideoTouch(
             return;
         }
 
-        if (!isDoubleTap && !stateRef.current.showSettings && !wasGesture) {
+        // 仅在明确满足 isTap（非拖拽、非手势、非双击）时才执行 300ms 延时开关控制栏
+        if (!isDoubleTap && !stateRef.current.showSettings && isTap && !wasGesture) {
             // Delayed single-tap: toggle controls visibility (not play/pause)
             pendingTimerRef.current = setTimeout(() => {
                 // 使用函数式更新避免闭包中 isHovering 过期

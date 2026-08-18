@@ -203,12 +203,13 @@ export function useVideoGestures({
         }
 
         const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+        const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
         const touchDuration = Date.now() - touchStartRef.current.time;
 
         // Handle tap (short duration, no significant drag) - returns true if it was a tap
         const isTap = gestureTypeRef.current === 'none'
             && touchDuration < CONFIG.TAP_MAX_DURATION
-            && Math.abs(deltaX) < CONFIG.TAP_MAX_MOVEMENT;
+            && Math.hypot(deltaX, deltaY) < CONFIG.TAP_MAX_MOVEMENT;
 
         const wasGesture = gestureActiveRef.current;
 

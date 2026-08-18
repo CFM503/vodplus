@@ -1,3 +1,11 @@
+# VODplus v0.9.43 - Mobile Tap & Touch Gesture State Machine Fix
+
+## Bug Fixes
+- **消除轻触盲区与控制栏闪烁消失**: 将 `TAP_MAX_MOVEMENT` 阈值由 10px 调优至 20px，在 `useVideoGestures` 中采用二维欧氏距离联合判定；重构 `handleTouchEndWired` 与 `useMobileVideoTouch`，透传完整的 `{ isTap, wasGesture }` 状态并移除底层同步 `setIsHovering(true)`，将控制栏显示/隐藏决策权统一收敛至 `useMobileVideoTouch`，彻底解决真机轻触手指微移（10~30px）导致控制栏一闪即逝或无响应的问题。
+- **防止轻触误触发进度条跳转**: 规范手势与单击判定条件，严格隔离轻触（isTap）与滑动快进（Seek 手势），杜绝微小滑动误判为进度跳转。
+
+---
+
 # VODplus v0.9.42 - Mobile Control Bar Layout & Responsive Fix
 
 ## Bug Fixes

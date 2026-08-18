@@ -152,8 +152,8 @@ export const CONFIG = {
     TAP_MAX_DURATION: 300,
 
     // 点击手势最大位移 (像素)
-    // 超过此位移算拖拽
-    TAP_MAX_MOVEMENT: 10,
+    // 超过此位移算拖拽 (调至 20px 消除 10~30px 轻触盲区)
+    TAP_MAX_MOVEMENT: 20,
 
     // 拖动进度条结束后的点击抑制时间 (毫秒)
     // 防止拖动结束时误触发点击暂停

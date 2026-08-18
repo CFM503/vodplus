@@ -368,22 +368,15 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     }, [url, hlsSource.isLoading, showToast]);
 
     // Wiring: touch end → gesture cleanup (tap handling delegated to useMobileVideoTouch in VideoPlayer.tsx)
-    // 返回值 wasGesture=true 表示本次触摸是亮度/音量拖拽或长按倍速等手势，
-    // 供 useMobileVideoTouch 决定是否跳过控制栏单击开关逻辑
-    const handleTouchEndWired = useCallback((e: React.TouchEvent): boolean => {
+    // 返回完整 { isTap, wasGesture } 供 useMobileVideoTouch 统一决断是否执行 300ms 延时 toggle，
+    // 严禁在此同步调用 controls.setIsHovering(true)，彻底消除双重触发导致的控制栏闪烁消失
+    const handleTouchEndWired = useCallback((e: React.TouchEvent): { isTap: boolean; wasGesture: boolean } => {
         const { isTap, wasGesture } = gestures.handleTouchEnd(e);
         if (isTap) {
             if (e.cancelable) e.preventDefault();
-            // Mobile tap handling (controls toggle / double-tap) is delegated to
-            // useMobileVideoTouch in VideoPlayer.tsx for YouTube-style behavior.
-            // Do NOT call controls.handleVideoClick here.
         }
-        // 手势结束时不要弹出控制栏，避免与手势 HUD / 后续单击开关冲突
-        if (!isTap && !wasGesture) {
-            controls.setIsHovering(true);
-        }
-        return wasGesture;
-    }, [gestures.handleTouchEnd, controls.setIsHovering]);
+        return { isTap, wasGesture };
+    }, [gestures.handleTouchEnd]);
 
     // Wiring: mouse move → show controls (skip when settings open to prevent flicker)
     const handleMouseMoveWired = useCallback((e: React.MouseEvent) => {
