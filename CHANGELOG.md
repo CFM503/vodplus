@@ -1,3 +1,23 @@
+# VODplus v0.9.40 - Mobile Touch & Android WebView Compatibility Enhancement
+
+## Features & Optimizations
+- **播放器全屏无缝降级 (Pseudo-Fullscreen)**: 当 Android WebView（如 BigEyes App）未实现原生全屏宿主接口或 iOS Safari 环境导致 `requestFullscreen()` 拒绝时，自动无缝降级为网页全屏（Pseudo-Fullscreen），解决移动端点击全屏按钮无反应问题。
+- **全屏状态与图标同步**: 统一多浏览器原生全屏与伪全屏状态监听，全屏按钮图标准确在 `<Maximize />` 与 `<Minimize />` 之间切换，支持 ESC 键与页面返回自动退出并恢复 body 滚动。
+- **全屏安全区域适配 (Safe Area Insets)**: 为原生全屏与伪全屏容器配置 `height: 100dvh` 与 `padding: env(safe-area-inset-*)`，避免刘海屏及底部手势导航条遮挡控制栏。
+- **资源管理「导入」兼容增强**: 使用原生 `<label htmlFor>` 关联文件输入框，解决部分 Android WebView 沙箱禁止脚本 `.click()` 唤起隐藏 input 的问题；新增“从剪贴板粘贴”一键导入能力。
+- **资源管理「导出」剪贴板同步与查看器**: 导出时自动将 JSON 配置复制至系统剪贴板，延迟 1000ms 销毁 ObjectURL 保证下载管理器读取；新增“查看/一键复制 JSON”弹层，彻底解决 Android WebView 无原生下载监听时无法导出源配置的问题。
+- **移动端触控热区标准化**: 移动端控制栏按钮、上一集/下一集按钮、设置图标与导航入口统一配置 `min-w-[40px] min-h-[40px]` 触控区域。
+
+## Bug Fixes
+- **设置面板/切集/播放按钮双重触发 (Touch+Click)**: 清理各按钮上的 `onTouchEnd` 业务逻辑，保留 touch 冒泡隔离，统一由 `onClick` 单一处理，彻底修复移动端设置面板“一触即关”、切集“单次点击跳两集”、播放按键“按一次触发两次”等问题。
+- **控制栏触摸泄漏**: 控制栏容器设置为 `pointer-events-none`（顶底栏 `pointer-events-auto`），补全所有控制栏组件的 touch 冒泡拦截，消除触摸控制栏误触发视频背景暂停或关闭控制栏的 Bug。
+- **进度条点击与拖拽坐标偏移**: `VideoProgressBar` 在 `onPointerDown` 时即时刷新 `getBoundingClientRect()`，解决页面滚动、旋转或软键盘弹出后进度条百分比计算偏差。
+- **暂停状态下拖拽进度条强制起播**: 增加 `wasPlayingBeforeSeekRef` 追踪，仅在拖拽前正在播放时才在 seek 结束后恢复播放，避免暂停状态被破坏。
+- **快速点击连续误判双击**: 双击执行完成后强制重置 `lastTapRef.current = 0`，防止第 3 次快速点击再次误判为双击。
+- **滑动误触长按倍速**: 检测到手指位移超过 15px 时立即清理 `longPressTimerRef`，避免滑动过程中误触发 3x 倍速。
+
+---
+
 # VODplus v0.9.39 - Direct-Stream Only Line Filtering
 
 ## Features & Optimizations

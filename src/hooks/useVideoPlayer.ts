@@ -422,6 +422,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         videoScale,
 
         isWebFullscreen: controls.isWebFullscreen,
+        isFullscreen: controls.isFullscreen,
         isDragging: seek.isDragging,
         dragProgress: seek.dragProgress,
         brightness: gestures.brightness,

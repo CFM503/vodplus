@@ -70,17 +70,39 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }, [searchTerm, mergedSources]);
 
     // ===== 导出 =====
+    const [exportNotice, setExportNotice] = useState<string | null>(null);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportJsonString, setExportJsonString] = useState('');
+
     const handleExport = () => {
         const payload = buildExportPayload(disabledSources, customSources);
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `vodplus-sources-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const jsonStr = JSON.stringify(payload, null, 2);
+        setExportJsonString(jsonStr);
+
+        // 1. 自动尝试复制到剪贴板（Android WebView 即使宿主未实现下载也能成功获取配置）
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(jsonStr).catch(() => {});
+        }
+
+        // 2. 触发标准 Blob 文件下载
+        try {
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vodplus-sources-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
+                URL.revokeObjectURL(url);
+            }, 1000);
+        } catch {}
+
+        setExportNotice('已触发下载，且已将配置复制到剪贴板！');
+        setTimeout(() => setExportNotice(null), 5000);
     };
 
     // ===== 导入 =====
@@ -96,6 +118,22 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         };
         reader.readAsText(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handlePasteFromClipboard = async () => {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    setImportText(text);
+                    setImportError(null);
+                    return;
+                }
+            }
+            setImportError('剪贴板为空，或请长按输入框直接粘贴');
+        } catch {
+            setImportError('浏览器限制读取剪贴板，请长按输入框直接粘贴');
+        }
     };
 
     const handleConfirmImport = () => {
@@ -351,6 +389,19 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     </div>
                                 </div>
 
+                                {/* 导出成功/提示横幅 */}
+                                {exportNotice && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 flex items-center justify-between text-xs text-emerald-300 animate-in slide-in-from-top-2">
+                                        <span className="truncate">{exportNotice}</span>
+                                        <button
+                                            onClick={() => setShowExportModal(true)}
+                                            className="shrink-0 ml-2 px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 text-[11px] font-bold rounded"
+                                        >
+                                            查看JSON
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* 添加自定义源 */}
                                 {showAddForm && (
                                     <div className="bg-slate-950/40 border border-indigo-500/20 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
@@ -386,17 +437,72 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     </div>
                                 )}
 
+                                {/* 导出查看弹层 */}
+                                {showExportModal && (
+                                    <div className="bg-slate-950/90 border border-emerald-500/30 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
+                                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                                            <span className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> 导出 JSON 内容</span>
+                                            <button
+                                                onClick={() => {
+                                                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                                        navigator.clipboard.writeText(exportJsonString);
+                                                    }
+                                                }}
+                                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded"
+                                            >
+                                                一键复制
+                                            </button>
+                                        </div>
+                                        <textarea
+                                            readOnly
+                                            value={exportJsonString}
+                                            rows={5}
+                                            className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-slate-200 font-mono outline-none resize-none select-all"
+                                        />
+                                        <button
+                                            onClick={() => setShowExportModal(false)}
+                                            className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg"
+                                        >
+                                            关闭
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* 导入面板 */}
                                 {showImport && (
                                     <div className="bg-slate-950/40 border border-amber-500/20 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
-                                        <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                                            <Upload className="h-3.5 w-3.5" /> 导入源列表
+                                        <div className="text-xs font-bold text-amber-300 flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> 导入源列表</span>
+                                            <button
+                                                type="button"
+                                                onClick={handlePasteFromClipboard}
+                                                className="text-[11px] text-amber-400 hover:text-amber-300 font-bold underline"
+                                            >
+                                                从剪贴板粘贴
+                                            </button>
                                         </div>
-                                        <button onClick={() => fileInputRef.current?.click()} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition-all">
+                                        <label
+                                            htmlFor="vod-json-file-input"
+                                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
+                                        >
+                                            <Upload className="h-3.5 w-3.5" />
                                             选择 JSON 文件
-                                        </button>
-                                        <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} className="hidden" />
-                                        <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="或直接粘贴导出的 JSON 内容..." rows={4} className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white font-mono focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-600 resize-none" />
+                                            <input
+                                                id="vod-json-file-input"
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".json,application/json,text/plain"
+                                                onChange={handleImportFile}
+                                                className="sr-only"
+                                            />
+                                        </label>
+                                        <textarea
+                                            value={importText}
+                                            onChange={(e) => setImportText(e.target.value)}
+                                            placeholder="或在此直接粘贴导出的 JSON 内容..."
+                                            rows={4}
+                                            className="w-full bg-slate-950 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white font-mono focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-600 resize-none"
+                                        />
                                         {importError && <div className="text-[11px] text-red-400">{importError}</div>}
                                         <div className="flex gap-2 pt-1">
                                             <button onClick={handleConfirmImport} className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all active:scale-[0.98]">确认导入</button>

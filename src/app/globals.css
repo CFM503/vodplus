@@ -55,9 +55,49 @@
 .player-fullscreen:fullscreen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   aspect-ratio: auto;
   border-radius: 0;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.player-fullscreen:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 移动端/WebView 原生全屏受限时的网页全屏（Pseudo Fullscreen） */
+.player-web-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  aspect-ratio: auto !important;
+  z-index: 999999 !important;
+  background: #000 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Premium shimmer animation for skeletal loading */

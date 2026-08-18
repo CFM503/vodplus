@@ -343,6 +343,9 @@ export function useMobileVideoTouch(
         pendingDoubleTapRef.current = false;
 
         if (shouldDoubleTap && refs.containerRef.current) {
+            // 重置 lastTapRef，避免连续第 3 次快速点击再次误判为双击
+            refs.lastTapRef.current = 0;
+
             const container = refs.containerRef.current;
             const rect = container.getBoundingClientRect();
             const x = e.changedTouches[0].clientX;
@@ -373,6 +376,14 @@ export function useMobileVideoTouch(
         }
     }, []); // stable
 
+    const handleTouchCancel = useCallback(() => {
+        if (pendingTimerRef.current) {
+            clearTimeout(pendingTimerRef.current);
+            pendingTimerRef.current = null;
+        }
+        pendingDoubleTapRef.current = false;
+    }, []);
+
     // Cleanup
     useEffect(() => {
         return () => {
@@ -380,7 +391,7 @@ export function useMobileVideoTouch(
         };
     }, []);
 
-    return { handleTouchStart, handleTouchEnd };
+    return { handleTouchStart, handleTouchEnd, handleTouchCancel };
 }
 
 /**

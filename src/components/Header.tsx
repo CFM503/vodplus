@@ -51,14 +51,14 @@ export function Header() {
                     </div>
 
                     <div className="flex items-center space-x-2 sm:space-x-4">
-                        <nav className="flex items-center space-x-4 text-sm font-bold text-slate-400 shrink-0">
-                            <Link href="/" prefetch={true} className="hover:text-white transition-colors hidden md:block">首页</Link>
-                            <Link href="/latest" prefetch={true} className="hover:text-white transition-colors">片库</Link>
+                        <nav className="flex items-center space-x-2 sm:space-x-4 text-sm font-bold text-slate-400 shrink-0">
+                            <Link href="/" prefetch={true} className="px-2 py-1.5 hover:text-white transition-colors hidden md:block">首页</Link>
+                            <Link href="/latest" prefetch={true} className="px-2.5 py-1.5 hover:text-white transition-colors">片库</Link>
                         </nav>
 
                         <button
                             onClick={() => setIsSettingsOpen(true)}
-                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-90"
+                            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-90"
                             title="设置"
                         >
                             <Settings className="h-5 w-5" />

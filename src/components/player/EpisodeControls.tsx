@@ -16,27 +16,15 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
 
     const stopPropagation = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
 
-    const handlePrevTouchEnd = useCallback((e: React.TouchEvent) => {
+    const handlePrevClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        e.preventDefault();
         if (hasPrevEpisode) onPrevEpisode?.();
     }, [hasPrevEpisode, onPrevEpisode]);
 
-    const handlePrevClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        onPrevEpisode?.();
-    }, [onPrevEpisode]);
-
-    const handleNextTouchEnd = useCallback((e: React.TouchEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        if (hasNextEpisode) onNextEpisode?.();
-    }, [hasNextEpisode, onNextEpisode]);
-
     const handleNextClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        onNextEpisode?.();
-    }, [onNextEpisode]);
+        if (hasNextEpisode) onNextEpisode?.();
+    }, [hasNextEpisode, onNextEpisode]);
 
     return (
         <div
@@ -45,12 +33,12 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
         >
             <button
                 onTouchStart={stopPropagation}
-                onTouchEnd={handlePrevTouchEnd}
+                onTouchEnd={stopPropagation}
                 onClick={handlePrevClick}
                 disabled={!hasPrevEpisode}
                 className={cn(
                     "p-1 transition-all active:scale-90 disabled:opacity-20 shrink-0",
-                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "hover:bg-white/10 rounded-full"
+                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full"
                 )}
                 title="上一集"
             >
@@ -60,12 +48,12 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
             </button>
             <button
                 onTouchStart={stopPropagation}
-                onTouchEnd={handleNextTouchEnd}
+                onTouchEnd={stopPropagation}
                 onClick={handleNextClick}
                 disabled={!hasNextEpisode}
                 className={cn(
                     "p-1 transition-all active:scale-90 disabled:opacity-20 shrink-0",
-                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "hover:bg-white/10 rounded-full"
+                    variant === 'desktop' ? "p-1.5 hover:text-indigo-400" : "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full"
                 )}
                 title="下一集"
             >

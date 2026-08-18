@@ -66,35 +66,138 @@ export function useVideoControls({
         lastTapRef.current = now;
     }, [containerRef, togglePlay, handleSeekRelative, showGestureHUD, lastSeekEndTimeRef]);
 
+    const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
+
+    // 监听原生全屏状态变化
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const doc = document as any;
+            const isFull = !!(
+                doc.fullscreenElement ||
+                doc.webkitFullscreenElement ||
+                doc.mozFullScreenElement ||
+                doc.msFullscreenElement
+            );
+            setIsNativeFullscreen(isFull);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
+    }, []);
+
+    // 网页全屏（Pseudo Fullscreen）切换
+    const toggleWebFullscreen = useCallback((forceState?: boolean) => {
+        const container = containerRef.current;
+        if (!container) return;
+        const next = typeof forceState === 'boolean' ? forceState : !isWebFullscreen;
+        if (next) {
+            container.classList.add('player-web-fullscreen');
+            document.body.style.overflow = 'hidden';
+            setIsWebFullscreen(true);
+        } else {
+            container.classList.remove('player-web-fullscreen');
+            document.body.style.overflow = '';
+            setIsWebFullscreen(false);
+        }
+    }, [containerRef, isWebFullscreen]);
+
+    // 全屏总开关：优先尝试标准 Fullscreen API，若宿主 WebView 拒绝/不支持则无缝降级为网页全屏
     const toggleFullscreen = useCallback(() => {
         const container = containerRef.current;
         if (!container) return;
 
-        if (document.fullscreenElement) {
-            const exit = document.exitFullscreen?.();
-            if (exit && typeof exit.catch === 'function') {
-                exit.catch(() => { /* 忽略退出全屏失败 */ });
+        const doc = document as any;
+        const isNative = !!(
+            doc.fullscreenElement ||
+            doc.webkitFullscreenElement ||
+            doc.mozFullScreenElement ||
+            doc.msFullscreenElement
+        );
+
+        // 若当前处于网页全屏或原生全屏状态，则退出
+        if (isWebFullscreen) {
+            toggleWebFullscreen(false);
+            return;
+        }
+
+        if (isNative) {
+            const exit = doc.exitFullscreen ||
+                doc.webkitExitFullscreen ||
+                doc.mozCancelFullScreen ||
+                doc.msExitFullscreen;
+            if (exit) {
+                try {
+                    const p = exit.call(doc);
+                    if (p && typeof p.catch === 'function') {
+                        p.catch(() => { /* 忽略退出全屏失败 */ });
+                    }
+                } catch {}
             }
             return;
         }
 
-        const request = container.requestFullscreen?.();
-        if (request && typeof request.catch === 'function') {
-            request.catch(() => { /* 忽略：用户手势/浏览器权限等原因导致全屏被拒绝 */ });
-        }
-    }, [containerRef]);
+        // 优先使用标准原生 Fullscreen API
+        const el = container as any;
+        const request = el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.mozRequestFullScreen ||
+            el.msRequestFullscreen;
 
-    const toggleWebFullscreen = useCallback(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        if (!isWebFullscreen) {
-            container.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:999999;background:#000;border-radius:0;';
-            setIsWebFullscreen(true);
+        if (request) {
+            try {
+                const p = request.call(el);
+                if (p && typeof p.then === 'function') {
+                    p.catch((_err: unknown) => {
+                        // 当 Android WebView 宿主未实现 onShowCustomView 时，requestFullscreen 会 reject
+                        // 此时自动无缝降级为网页全屏（Pseudo-Fullscreen），保证用户点击绝对有反应且全屏可用
+                        toggleWebFullscreen(true);
+                    });
+                }
+            } catch {
+                toggleWebFullscreen(true);
+            }
         } else {
-            container.style.cssText = '';
-            setIsWebFullscreen(false);
+            // iOS Safari 等特殊环境处理
+            const video = container.querySelector('video') as any;
+            if (video && typeof video.webkitEnterFullscreen === 'function') {
+                try {
+                    video.webkitEnterFullscreen();
+                } catch {
+                    toggleWebFullscreen(true);
+                }
+            } else {
+                toggleWebFullscreen(true);
+            }
         }
-    }, [containerRef, isWebFullscreen]);
+    }, [containerRef, isWebFullscreen, toggleWebFullscreen]);
+
+    // 网页全屏下按 ESC 退出
+    useEffect(() => {
+        if (!isWebFullscreen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                toggleWebFullscreen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isWebFullscreen, toggleWebFullscreen]);
+
+    // 组件卸载时恢复 body 滚动
+    useEffect(() => {
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, []);
 
     // 设置面板鼠标活动追踪（节流，最多每秒触发一次状态更新）
     const lastActivityUpdateRef = useRef(0);
@@ -112,8 +215,6 @@ export function useVideoControls({
     }, []);
 
     // 设置面板不活动超时后自动关闭
-    // 依赖 settingsActivityCount 在用户移动鼠标时重置计时器
-    // 注意：不能依赖 isHovering，因为 true→true 不触发重渲染
     useEffect(() => {
         if (!showSettings) return;
         const timeout = setTimeout(() => {
@@ -123,9 +224,12 @@ export function useVideoControls({
         return () => clearTimeout(timeout);
     }, [showSettings, settingsActivityCount, setShowSettings, setIsHovering]);
 
+    const isFullscreen = isNativeFullscreen || isWebFullscreen;
+
     return {
         isHovering,
         setIsHovering,
+        isFullscreen,
         isWebFullscreen,
         handleVideoClick,
         toggleFullscreen,

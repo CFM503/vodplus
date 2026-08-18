@@ -53,9 +53,14 @@ const VideoControls = React.memo(function VideoControls({
     } = player;
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full pointer-events-none">
             {/* Top Overlay Gradient */}
-            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent">
+            <div
+                className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto"
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+            >
                 {CONFIG.SHOW_EPISODE_TITLE_OVERLAY && title && (
                     <h2 className="text-white text-base md:text-lg font-medium drop-shadow-md select-text truncate max-w-[calc(100%-3rem)] md:max-w-[60%] pr-2">
                         {title}
@@ -67,10 +72,15 @@ const VideoControls = React.memo(function VideoControls({
             <div className="flex-1" />
 
             {/* Bottom Controls */}
-            <div className={cn(
-                "relative",
-                showSettings ? "" : "bg-gradient-to-t from-black/70 to-transparent"
-            )}>
+            <div
+                className={cn(
+                    "relative pointer-events-auto",
+                    showSettings ? "" : "bg-gradient-to-t from-black/70 to-transparent"
+                )}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+            >
                 {/* Mobile layout */}
                 <div className="flex md:hidden flex-col p-2 pb-3 gap-0.5">
                     <div className="px-1">
@@ -80,9 +90,9 @@ const VideoControls = React.memo(function VideoControls({
                         <div className="flex items-center gap-1 shrink-0 min-w-0">
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); togglePlay(); }}
+                                onTouchEnd={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
+                                className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                             >
                                 {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-0.5" />}
                             </button>
@@ -97,9 +107,9 @@ const VideoControls = React.memo(function VideoControls({
 
                             <button
                                 onTouchStart={(e) => e.stopPropagation()}
-                                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); toggleMute(); }}
+                                onTouchEnd={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                                className="p-1.5 hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
+                                className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-white/10 rounded-full active:scale-90 transition-transform shrink-0"
                                 title={isMuted ? "取消静音" : "静音"}
                             >
                                 {isMuted ? <VolumeX className="w-5 h-5 text-indigo-400" /> : <Volume2 className="w-5 h-5 text-white" />}

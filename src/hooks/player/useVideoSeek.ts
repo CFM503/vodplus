@@ -15,14 +15,19 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
     const [isDragging, setIsDragging] = useState(false);
     const [dragProgress, setDragProgress] = useState(0);
     const lastSeekEndTimeRef = useRef(0);
+    const wasPlayingBeforeSeekRef = useRef(false);
 
     /**
      * Called by the progress bar component when drag starts.
      */
     const handleSeekStart = useCallback((percent: number) => {
+        const video = videoRef.current;
+        if (video) {
+            wasPlayingBeforeSeekRef.current = !video.paused;
+        }
         setIsDragging(true);
         setDragProgress(percent);
-    }, []);
+    }, [videoRef]);
 
     /**
      * Called by the progress bar component when drag moves.
@@ -39,7 +44,6 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
     /**
      * Called by the progress bar component when drag ends.
      * Performs the actual video seek and resumes playback.
-     * 优化：添加播放状态检查，避免重复播放
      */
     const handleSeekEnd = useCallback((percent: number) => {
         const video = videoRef.current;
@@ -52,8 +56,8 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
                 if (setProgressProp) setProgressProp(percent);
             }
 
-            // Resume playback after seeking - 只在视频原本在播放时才恢复
-            if (video.paused && !video.ended) {
+            // Resume playback after seeking - 只在视频拖动前原本在播放时才恢复
+            if (wasPlayingBeforeSeekRef.current && video.paused && !video.ended) {
                 video.play().catch(error => {
                     if (error instanceof Error && error.name !== 'AbortError') {
                         console.warn('播放恢复失败:', error.message);
@@ -64,7 +68,7 @@ export function useVideoSeek({ videoRef, progressBarRef, hlsRef, isHoveringRef, 
             // HLS流需要重新加载 - 优化：使用requestAnimationFrame避免阻塞
             if (hlsRef.current) {
                 requestAnimationFrame(() => {
-                    if (hlsRef.current && video.paused) {
+                    if (hlsRef.current && wasPlayingBeforeSeekRef.current && video.paused) {
                         hlsRef.current.startLoad();
                     }
                 });

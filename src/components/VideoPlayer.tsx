@@ -151,7 +151,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     }, [player.onSettingsPanelClick]);
 
     // 移动端交互规则
-    const { handleTouchStart: handleMobileTouchStart, handleTouchEnd: handleMobileTouchEnd } = useMobileVideoTouch(refs, actions, state);
+    const { handleTouchStart: handleMobileTouchStart, handleTouchEnd: handleMobileTouchEnd, handleTouchCancel: handleMobileTouchCancel } = useMobileVideoTouch(refs, actions, state);
     const handleMobileSettingsToggle = useMobileSettingsToggle(state, actions);
     const handleMobileCloseSettingsOnBackdrop = useMobileCloseSettingsOnBackdrop(actions);
 
@@ -169,6 +169,11 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
     const handleContainerTouchEnd = useCallback((e: React.TouchEvent) => {
         handleMobileTouchEnd(e);
     }, [handleMobileTouchEnd]);
+
+    const handleContainerTouchCancel = useCallback(() => {
+        handleTouchCancel();
+        handleMobileTouchCancel();
+    }, [handleTouchCancel, handleMobileTouchCancel]);
 
     return (
         <div
@@ -192,7 +197,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
             onTouchStart={handleContainerTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleContainerTouchEnd}
-            onTouchCancel={handleTouchCancel}
+            onTouchCancel={handleContainerTouchCancel}
             onClick={handlePCVideoClick}
             onDoubleClick={handlePCVideoDoubleClick}
         >
@@ -268,12 +273,10 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
             {/* Controls - z-20 */}
             <div
                 className={cn(
-                    "absolute inset-0 transition-opacity duration-300 z-20",
-                    isHovering || !isPlaying || showSettings ? "opacity-100" : "opacity-0 pointer-events-none"
+                    "absolute inset-0 transition-opacity duration-300 z-20 pointer-events-none",
+                    isHovering || !isPlaying || showSettings ? "opacity-100" : "opacity-0"
                 )}
                 onMouseMove={handlePCControlsHover}
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
             >
                 <VideoControls
                     player={player}
@@ -308,7 +311,9 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
                     ref={mobileSettingsPanelRef}
                     className="fixed inset-0 z-[100] flex items-end justify-center md:hidden"
                     onClick={(e) => { e.stopPropagation(); e.nativeEvent.stopPropagation(); }}
+                    onTouchStart={(e) => e.stopPropagation()}
                     onTouchMove={handlePCControlsHover}
+                    onTouchEnd={(e) => e.stopPropagation()}
                 >
                     <div
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in"

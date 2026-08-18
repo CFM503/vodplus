@@ -16,12 +16,13 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
         showSettings,
         toggleFullscreen,
         toggleWebFullscreen,
-        isWebFullscreen
+        isWebFullscreen,
+        isFullscreen,
     } = player;
 
     const iconClass = variant === 'mobile' ? "w-5 h-5 text-white" : "w-6 h-6 text-white";
     const btnClass = variant === 'mobile'
-        ? "p-2 rounded-full hover:bg-white/10 active:scale-95 transition-all"
+        ? "p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all"
         : "p-1 hover:scale-110 transition-transform hover:text-indigo-400";
 
     const handleSettingsClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -49,7 +50,7 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
                 <button
                     data-settings-toggle
                     onTouchStart={stopPropagation}
-                    onTouchEnd={handleSettingsClick}
+                    onTouchEnd={stopPropagation}
                     onClick={handleSettingsClick}
                     className={cn(
                         btnClass,
@@ -83,9 +84,9 @@ const ControlButtons = React.memo(function ControlButtons({ player, variant = 'd
                 onTouchEnd={stopPropagation}
                 onClick={handleFullscreenClick}
                 className={cn(btnClass, "shrink-0")}
-                title="全屏"
+                title={isFullscreen ? "退出全屏" : "全屏"}
             >
-                <Maximize className={iconClass} />
+                {isFullscreen ? <Minimize className={iconClass} /> : <Maximize className={iconClass} />}
             </button>
         </div>
     );

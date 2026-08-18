@@ -118,6 +118,12 @@ export function useVideoGestures({
         const deltaY = touch.clientY - touchStartRef.current.y;
         const containerRect = containerRef.current.getBoundingClientRect();
 
+        // 手指发生位移时取消长按计时器
+        if (longPressTimerRef.current && (Math.abs(deltaX) > CONFIG.TAP_MAX_MOVEMENT || Math.abs(deltaY) > CONFIG.TAP_MAX_MOVEMENT)) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+
         // 识别垂直手势：左半屏亮度 / 右半屏音量
         if (gestureTypeRef.current === 'none' && Math.abs(deltaY) > CONFIG.GESTURE_VERTICAL_THRESHOLD
             && Math.abs(deltaY) > Math.abs(deltaX) * CONFIG.GESTURE_ASPECT_RATIO_THRESHOLD) {
@@ -239,6 +245,14 @@ export function useVideoGestures({
             hideGestureHUD();
         }
     }, [isSpeedHolding, showGestureHUD, hideGestureHUD]);
+
+    // 组件卸载时清理所有定时器
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+            if (gestureHUDTimerRef.current) clearTimeout(gestureHUDTimerRef.current);
+        };
+    }, []);
 
     return {
         brightness,

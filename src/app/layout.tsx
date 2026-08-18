@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
@@ -6,6 +6,15 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 export const metadata: Metadata = {
   title: "vod",
   description: "vod - 极速影院",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#020617",
 };
 
 export default function RootLayout({
