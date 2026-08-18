@@ -274,7 +274,7 @@ function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpis
             <div
                 className={cn(
                     "absolute inset-0 transition-opacity duration-300 z-20 pointer-events-none",
-                    isHovering || !isPlaying || showSettings ? "opacity-100" : "opacity-0"
+                    isHovering || !isPlaying || showSettings ? "opacity-100" : "opacity-0 invisible"
                 )}
                 onMouseMove={handlePCControlsHover}
             >

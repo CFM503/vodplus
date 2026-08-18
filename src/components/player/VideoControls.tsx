@@ -41,6 +41,7 @@ const VideoControls = React.memo(function VideoControls({
 }: VideoControlsProps) {
     const {
         isPlaying,
+        isHovering,
         togglePlay,
         toggleMute,
         isMuted,
@@ -52,14 +53,19 @@ const VideoControls = React.memo(function VideoControls({
         showSettings,
     } = player;
 
+    const isControlsVisible = isHovering || !isPlaying || showSettings;
+
     return (
         <div className="flex flex-col h-full pointer-events-none">
             {/* Top Overlay Gradient */}
             <div
-                className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-auto"
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => e.stopPropagation()}
+                className={cn(
+                    "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent",
+                    isControlsVisible ? "pointer-events-auto" : "pointer-events-none"
+                )}
+                onTouchStart={(e) => { if (isControlsVisible) e.stopPropagation(); }}
+                onTouchMove={(e) => { if (isControlsVisible) e.stopPropagation(); }}
+                onTouchEnd={(e) => { if (isControlsVisible) e.stopPropagation(); }}
             >
                 {CONFIG.SHOW_EPISODE_TITLE_OVERLAY && title && (
                     <h2 className="text-white text-base md:text-lg font-medium drop-shadow-md select-text truncate max-w-[calc(100%-3rem)] md:max-w-[60%] pr-2">
@@ -74,12 +80,13 @@ const VideoControls = React.memo(function VideoControls({
             {/* Bottom Controls */}
             <div
                 className={cn(
-                    "relative pointer-events-auto",
+                    "relative",
+                    isControlsVisible ? "pointer-events-auto" : "pointer-events-none",
                     showSettings ? "" : "bg-gradient-to-t from-black/70 to-transparent"
                 )}
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => e.stopPropagation()}
+                onTouchStart={(e) => { if (isControlsVisible) e.stopPropagation(); }}
+                onTouchMove={(e) => { if (isControlsVisible) e.stopPropagation(); }}
+                onTouchEnd={(e) => { if (isControlsVisible) e.stopPropagation(); }}
             >
                 {/* Mobile layout */}
                 <div className="flex md:hidden flex-col px-2 pb-2.5 pt-1 gap-1">

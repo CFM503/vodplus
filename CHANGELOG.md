@@ -1,3 +1,10 @@
+# VODplus v0.9.46 - Hidden Controls Pointer Events & Seek Misclick Fix
+
+## Bug Fixes
+- **控制栏隐藏时点击穿透与进度条误触修复**: 解决控制栏在隐藏（`opacity-0`）状态下，子元素 `Bottom Controls` 与 `VideoProgressBar` 仍保持 `pointer-events-auto` 导致轻触视频下半部分误触发进度条跳转（Seek）的 Bug；在控制栏隐藏时将整层容器及顶底控制条同步置为 `pointer-events-none` 与 `invisible`，确保轻触任意区域 100% 穿透至播放器容器执行控制栏唤出逻辑。
+
+---
+
 # VODplus v0.9.45 - Experimental Fullscreen navigationUI Option & Fallback
 
 ## Optimizations
