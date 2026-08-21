@@ -8,6 +8,8 @@ import { RESOURCE_SITES } from '@/lib/resources';
 import { cookies } from 'next/headers';
 import { getUserPreferences } from '@/lib/preferences';
 import { parseVodPlayUrl } from '@/lib/vodParser';
+import { getAuthStatus } from '@/lib/auth';
+import LoginRequiredCard from '@/components/player/LoginRequiredCard';
 import ClientPlayerWrapper from './ClientPlayerWrapper';
 
 export const runtime = 'edge';
@@ -79,6 +81,10 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
         notFound();
     }
 
+    // Check if auth is required to watch
+    const authStatus = await getAuthStatus(cookieStore);
+    const isLocked = authStatus.enabled && !authStatus.authenticated;
+
     // Parse play urls using dedicated parser。
     // 传入源 baseUrl，用于把相对播放地址解析为绝对地址。
     const sourceBaseUrl = RESOURCE_SITES.find(s => s.id === movie.source_id)?.baseUrl
@@ -89,7 +95,7 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
     // Extract CDN hostname from the first episode URL for preconnect hint
     let cdnOrigin: string | null = null;
     try {
-        if (safeEpisodes.length > 0 && safeEpisodes[0].url) {
+        if (!isLocked && safeEpisodes.length > 0 && safeEpisodes[0].url) {
             const parsed = new URL(safeEpisodes[0].url);
             cdnOrigin = parsed.origin; // e.g. https://cdn.example.com
         }
@@ -109,7 +115,12 @@ export default async function MovieDetail({ params, searchParams }: PageProps) {
             <main className="container mx-auto px-4 pt-4">
                 {/* Player Section - Top Priority for Mobile */}
                 <div className="mb-8">
-                    {safeEpisodes.length > 0 ? (
+                    {isLocked ? (
+                        <LoginRequiredCard
+                            poster={movie.vod_pic}
+                            movieName={movie.vod_name}
+                        />
+                    ) : safeEpisodes.length > 0 ? (
                         <ClientPlayerWrapper
                             episodes={safeEpisodes}
                             poster={movie.vod_pic}

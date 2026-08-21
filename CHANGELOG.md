@@ -1,3 +1,15 @@
+# VODplus v0.9.47 - Cloudflare Pages Authentication & Watch Protection (用户密码登录观看)
+
+## Features & Security
+- **Cloudflare Pages 变量设置鉴权 (登录后观看)**: 支持在 Cloudflare Pages 环境变量中手动配置 `AUTH_USERNAME` 与 `AUTH_PASSWORD`（或多用户 `AUTH_USERS=u1:p1,u2:p2`），开启全站视频播放鉴权拦截；未配置时默认全开放，不影响现有部署。
+- **Edge 原生 Web Crypto 会话签名**: 使用浏览器及 Cloudflare Workers 原生 Web Crypto API (`crypto.subtle`) 签发与校验 HMAC-SHA256 安全 Cookie (`vod_session`，`HttpOnly`，30天免密有效)，零第三方庞大依赖，100% 适配 Edge Runtime。
+- **播放器未登录锁定卡片 (LoginRequiredCard)**: 未登录访问 `/movie/...` 播放页时，页面元信息与海报正常呈现，播放器区域自动替换为磨砂玻璃质感的「🔒 登录后即可观看」锁定占位卡片，阻断未授权的 m3u8 视频流解析与请求。
+- **全新登录页面与无缝回跳 (`/login`)**: 采用暗黑毛玻璃极简美学，支持密码可见切换、错误提醒与状态自检，登录成功后自动回跳至原观影页面并立即起播。
+- **顶部导航栏状态同步 (Header)**: 自适应显示登录入口、当前登录账号徽标以及快捷退出登录菜单。
+- **API 访问拦截防护**: `/api/vod/detail` 接口同步集成状态校验，防止直接请求接口探测视频流地址。
+
+---
+
 # VODplus v0.9.46 - Hidden Controls Pointer Events & Seek Misclick Fix
 
 ## Bug Fixes

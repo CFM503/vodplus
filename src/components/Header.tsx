@@ -1,15 +1,58 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, MonitorPlay, Settings } from 'lucide-react';
+import { Search, MonitorPlay, Settings, User, LogIn, LogOut } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const SettingsModal = dynamic(() => import('./SettingsModal'), { ssr: false });
 
 export function Header() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [authStatus, setAuthStatus] = useState<{ enabled: boolean; authenticated: boolean; username?: string } | null>(null);
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const userMenuRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        let isMounted = true;
+        fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                if (isMounted && data.code === 1) {
+                    setAuthStatus(data.data);
+                }
+            })
+            .catch(() => {});
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Close user menu on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setShowUserMenu(false);
+            }
+        };
+        if (showUserMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showUserMenu]);
+
+    const handleLogout = async () => {
+        setShowUserMenu(false);
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            setAuthStatus(prev => prev ? { ...prev, authenticated: false } : null);
+            router.refresh();
+        } catch {}
+    };
 
     return (
         <>
@@ -43,7 +86,7 @@ export function Header() {
                             </div>
                             <button
                                 type="submit"
-                                className="px-4 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-r-xl border border-indigo-500 transition-colors shadow-lg active:scale-95"
+                                className="px-4 py-2 md:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-r-xl border border-indigo-500 transition-colors shadow-lg active:scale-95 cursor-pointer"
                             >
                                 <Search className="h-4 w-4" />
                             </button>
@@ -56,9 +99,49 @@ export function Header() {
                             <Link href="/latest" prefetch={true} className="px-2.5 py-1.5 hover:text-white transition-colors">片库</Link>
                         </nav>
 
+                        {/* Authentication Status Badge / Buttons */}
+                        {authStatus?.enabled && (
+                            authStatus.authenticated ? (
+                                <div className="relative" ref={userMenuRef}>
+                                    <button
+                                        onClick={() => setShowUserMenu(!showUserMenu)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 text-slate-200 border border-indigo-500/30 text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                                        title={authStatus.username || '用户'}
+                                    >
+                                        <User className="w-3.5 h-3.5 text-indigo-400" />
+                                        <span className="hidden sm:inline max-w-[70px] truncate">{authStatus.username || '已登录'}</span>
+                                    </button>
+
+                                    {showUserMenu && (
+                                        <div className="absolute right-0 mt-2 w-36 bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95">
+                                            <div className="px-3 py-2 text-[11px] text-slate-400 border-b border-white/5 truncate">
+                                                账号: <strong className="text-white">{authStatus.username}</strong>
+                                            </div>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                                            >
+                                                <LogOut className="w-3.5 h-3.5" />
+                                                <span>退出登录</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <Link
+                                    href="/login"
+                                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                                    title="登录账号"
+                                >
+                                    <LogIn className="w-3.5 h-3.5" />
+                                    <span>登录</span>
+                                </Link>
+                            )
+                        )}
+
                         <button
                             onClick={() => setIsSettingsOpen(true)}
-                            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-90"
+                            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all active:scale-90 cursor-pointer"
                             title="设置"
                         >
                             <Settings className="h-5 w-5" />

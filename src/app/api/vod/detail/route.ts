@@ -3,6 +3,7 @@ import { cachedGetMovieDetail } from '@/lib/services/vodService';
 import { getUserPreferences } from '@/lib/preferences';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
+import { getAuthStatus } from '@/lib/auth';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,11 @@ export async function GET(request: NextRequest) {
 
     try {
         const cookieStore = await cookies();
+        const authStatus = await getAuthStatus(cookieStore);
+        if (authStatus.enabled && !authStatus.authenticated) {
+            return NextResponse.json({ code: 401, msg: 'Authentication required', data: null }, { status: 401 });
+        }
+
         const { disabledSources, customSources } = await getUserPreferences(cookieStore);
 
         const movie = await cachedGetMovieDetail(source, id, disabledSources, name, customSources);

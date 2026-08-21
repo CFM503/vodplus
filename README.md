@@ -22,6 +22,7 @@
 
 ## ✨ 核心特性
 
+- 🔒 **访问控制与鉴权 (Auth Protection)**：支持在 Cloudflare Pages 环境变量中手动配置用户名与密码（或多用户列表），启用「登录后观看」保护与安全 Cookie 鉴权。
 - 🌟 **TMDB 发现模式**：集成全量 TMDB 元数据，提供海量高清封面、评分和分类。
 - 🔗 **Match & Play (自动匹配)**：创新的“所见即所得”逻辑。点击 TMDB 内容，系统自动在全球资源网中寻找最佳播放线路。
 - ⚡ **高性能流式架构 (Streaming)**：
@@ -125,6 +126,21 @@ TMDB_API_KEY=your_tmdb_api_key_here
 
 # TMDB API 代理地址 (可选，默认 https://api.themoviedb.org/3)
 TMDB_API_BASE=https://api.themoviedb.org/3
+
+# ================================
+# 🔒 访问控制与登录观看 (可选)
+# ================================
+# 若配置了以下变量，站点将开启「登录才能观看」保护；不配置则默认免登录全开放。
+
+# 单用户模式 (用户名 + 密码)
+AUTH_USERNAME=admin
+AUTH_PASSWORD=your_password_here
+
+# 多用户模式 (可选，支持多个账号，逗号分隔)
+# AUTH_USERS=admin:password123,guest:guest888
+
+# Cookie 签名密钥 (可选，默认由密码派生，无需必填)
+# AUTH_SECRET=your_custom_secret_key
 ```
 
 ### 2. 部署到 Cloudflare Pages
