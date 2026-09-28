@@ -28,7 +28,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
     return (
         <div className="min-h-screen bg-slate-950 pb-20">
-            <Header />
+            <Header searchValue={keyword} />
 
             <main className="container mx-auto px-4 py-8">
                 <div className="mb-8">

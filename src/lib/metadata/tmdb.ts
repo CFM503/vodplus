@@ -52,7 +52,7 @@ export class TmdbMetadataProvider implements MetadataProvider {
             const timeoutId = setTimeout(() => controller.abort(), 3500);
 
             try {
-                let res = await fetch(`${TMDB_BASE_URL}/movie/${id}?api_key=${TMDB_API_KEY}&language=zh-CN`, {
+                const res = await fetch(`${TMDB_BASE_URL}/movie/${id}?api_key=${TMDB_API_KEY}&language=zh-CN`, {
                     signal: controller.signal
                 });
                 let data = await res.json();

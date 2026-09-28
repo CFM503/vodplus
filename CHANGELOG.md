@@ -1,3 +1,23 @@
+# VODplus v0.9.48 - Mobile Full-Screen Search Overlay & Lint/Rule Fix (移动端全屏搜索浮层)
+
+## Features
+- **移动端全屏搜索浮层 (SearchOverlay)**: `<640px` 时 Header 隐藏内联搜索框，改为 44×44 搜索图标按钮，点击进入全屏搜索浮层。输入框独占整行（48px 高、16px 字号避免 iOS 自动放大、自动聚焦弹出键盘、`enterKeyHint="search"`），背景滚动锁定，`Esc`/取消按钮关闭并恢复滚动。打开时自动回填当前搜索词（`/search` 页无缝续搜）。
+- **搜索历史 (最近搜索)**: 提交的关键词自动写入 `localStorage`（键 `VOD_SEARCH_HISTORY`，去重、按最新排序、上限 8 条），浮层内一键点选直达搜索；每条 44×44 删除按钮、整体「清空」，删除/清空后自动回焦输入框。数据损坏或存储不可用时静默降级，不影响搜索本身。
+- **移动端 Header 布局修复**: `<sm` 隐藏登录文字（`hidden sm:inline`）、右侧操作组 `shrink-0`、紧凑间距，修复登录态下整行被撑破换行的问题；搜索框容器补 `min-w-0`，输入框与按钮 `min-h` 触控高度升至 44px，搜索后关键词正确回填输入框。
+
+## Bug Fixes
+- **修复 24 处条件 Hook 违规 (`react-hooks/rules-of-hooks`)**: `VideoProgressBar.tsx`（17 处）、`MovieCard.tsx`（4 处）、`EpisodeControls.tsx`（3 处）在条件分支内调用 Hook，违反 Hooks 规则存在运行时崩溃风险；将早退语句移至全部 Hook 之后，并对可能为空的对象改用可选链（`api?.`、`movie.*?`）读取。**播放器行为、受保护特性与视觉均未改动**，仅调整 Hook 声明顺序。
+- **`prefer-const` 修正**: `tmdb.ts`、`sourceConfig.ts` 中声明后不再重新赋值的 `let` 改为 `const`。
+
+## Tooling
+- **新增 ESLint 9 flat config (`eslint.config.mjs`)**: 此前仓库无可用 ESLint 配置，`npm run lint` 直接报错退出。新配置以 `FlatCompat` 桥接 `next/core-web-vitals` 与 `next/typescript`；`no-explicit-any`、`no-unescaped-entities` 降级为 warn（存量风格问题，大范围改动与 `AGENTS.md` 冲突）。当前 `eslint .` 结果：**0 errors / 93 warnings，exit 0**。
+
+## Verification
+- `tsc --noEmit` 0 errors；`eslint .` 0 errors；`next build` 编译成功并生成 4/4 静态页。
+- 浏览器实测：浮层打开/自动聚焦/回填/提交/历史写入与删除/关闭后滚动恢复均正常，控制台 0 警告 0 水合错误。
+
+---
+
 # VODplus v0.9.47 - Cloudflare Pages Authentication & Watch Protection (用户密码登录观看)
 
 ## Features & Security

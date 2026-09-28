@@ -202,7 +202,7 @@ export function validateImportPayload(raw: string): ImportResult {
         disabledSources = o.disabledSources;
     }
 
-    let customSources: ResourceSite[] = [];
+    const customSources: ResourceSite[] = [];
     if (o.customSources !== undefined) {
         if (!Array.isArray(o.customSources)) {
             return { ok: false, error: 'customSources 字段格式不正确' };

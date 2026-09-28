@@ -11,18 +11,16 @@ import Link from 'next/link';
 import { parseVodPlayUrl } from '@/lib/vodParser';
 
 export function MovieCard({ movie, className, index = 999, latency: latencyProp }: { movie: Movie; className?: string; index?: number; latency?: number }) {
-    if (!movie) return null;
-
-    const isDiscoverySrc = movie.source_id === 'tmdb';
-    const safeHref = movie.source_id && movie.vod_id
-        ? `/movie/${movie.source_id}/${movie.vod_id}${isDiscoverySrc ? `?name=${encodeURIComponent(movie.vod_name)}` : ''}`
-        : `/search?q=${encodeURIComponent(movie.vod_name)}`;
-
-    const [imgSrc, setImgSrc] = useState(movie.vod_pic);
+    const [imgSrc, setImgSrc] = useState<string>(movie?.vod_pic ?? '');
     const hasPrefetchedRef = useRef(false);
     // Stable refs for movie identity — avoids recreating handlePrefetch on list re-renders
-    const movieIdRef = useRef({ source_id: movie.source_id, vod_id: movie.vod_id, isDiscoverySrc });
-    movieIdRef.current = { source_id: movie.source_id, vod_id: movie.vod_id, isDiscoverySrc };
+    const movieIdRef = useRef({ source_id: movie?.source_id, vod_id: movie?.vod_id, isDiscoverySrc: movie?.source_id === 'tmdb' });
+    movieIdRef.current = { source_id: movie?.source_id, vod_id: movie?.vod_id, isDiscoverySrc: movie?.source_id === 'tmdb' };
+
+    const isDiscoverySrc = movie?.source_id === 'tmdb';
+    const safeHref = movie?.source_id && movie?.vod_id
+        ? `/movie/${movie.source_id}/${movie.vod_id}${isDiscoverySrc ? `?name=${encodeURIComponent(movie.vod_name)}` : ''}`
+        : `/search?q=${encodeURIComponent(movie?.vod_name ?? '')}`;
 
     const handlePrefetch = useCallback(() => {
         const { source_id, vod_id, isDiscoverySrc: isDisc } = movieIdRef.current;
@@ -48,7 +46,10 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
                 }
             })
             .catch(() => { });
-    }, [movie.source_id, movie.vod_id, isDiscoverySrc]);
+    }, [movie?.source_id, movie?.vod_id, isDiscoverySrc]);
+
+    // 早退放在所有 Hook 之后：movie 由列表项变为 undefined 时避免 Hook 数量变化导致崩溃
+    if (!movie) return null;
 
     return (
         <Link
@@ -64,7 +65,7 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
         >
             <div className="absolute inset-0 z-0">
                 <Image
-                    src={imgSrc}
+                    src={imgSrc || movie.vod_pic}
                     alt={movie.vod_name}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 17vw"

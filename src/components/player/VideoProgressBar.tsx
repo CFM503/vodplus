@@ -13,16 +13,17 @@ interface VideoProgressBarProps {
 export default function VideoProgressBar({ player, progressApi, url, variant, className }: VideoProgressBarProps) {
     const api = progressApi || player;
 
-    if (!api) return null;
-
-    const progress: number = api.progress ?? 0;
-    const duration: number = api.duration ?? 0;
-    const buffered: number = api.buffered ?? 0;
-    const progressBarRef = api.progressBarRef;
-    const handleSeekStart: (percent: number) => void = api.handleSeekStart;
-    const handleSeekMove: (percent: number) => void = api.handleSeekMove;
-    const handleSeekEnd: (percent: number) => void = api.handleSeekEnd;
-    const handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void = api.handleProgressClick;
+    // 注意：早退必须放在所有 Hook 之后（见 return 前），否则 api 由 undefined 变为对象时
+    // Hook 调用数量改变，React 会抛出 "Rendered fewer hooks than expected" 崩溃。
+    // 因此这里全部用可选链读取，api 缺失时回落到 0/undefined 而不是直接抛错。
+    const progress: number = api?.progress ?? 0;
+    const duration: number = api?.duration ?? 0;
+    const buffered: number = api?.buffered ?? 0;
+    const progressBarRef = api?.progressBarRef;
+    const handleSeekStart: (percent: number) => void = api?.handleSeekStart;
+    const handleSeekMove: (percent: number) => void = api?.handleSeekMove;
+    const handleSeekEnd: (percent: number) => void = api?.handleSeekEnd;
+    const handleProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void = api?.handleProgressClick;
 
     // Ref for the actual visual track (the thin bar), used for precise position calculation
     const trackRef = useRef<HTMLDivElement>(null);
@@ -161,6 +162,9 @@ export default function VideoProgressBar({ player, progressApi, url, variant, cl
 
     // Show tooltip during hover or drag
     const showTooltip = duration > 0 && (isDragging || isHovering);
+
+    // 早退必须在所有 Hook 之后（规则见文件顶部说明）
+    if (!api) return null;
 
     return (
         <div

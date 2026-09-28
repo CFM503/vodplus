@@ -10,8 +10,6 @@ interface EpisodeControlsProps {
 }
 
 const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onNextEpisode, hasPrevEpisode, hasNextEpisode, variant = 'desktop' }: EpisodeControlsProps) {
-    if (!onPrevEpisode && !onNextEpisode) return null;
-
     const iconSize = variant === 'mobile' ? "w-4 h-4" : "w-6 h-6";
 
     const stopPropagation = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
@@ -25,6 +23,10 @@ const EpisodeControls = React.memo(function EpisodeControls({ onPrevEpisode, onN
         e.stopPropagation();
         if (hasNextEpisode) onNextEpisode?.();
     }, [hasNextEpisode, onNextEpisode]);
+
+    // 注意：早退必须放在所有 Hook 之后，否则 onPrev/onNext 由 undefined 变为函数时
+    // Hook 调用次数改变，React 会抛出 "Rendered fewer hooks than expected" 崩溃。
+    if (!onPrevEpisode && !onNextEpisode) return null;
 
     return (
         <div
