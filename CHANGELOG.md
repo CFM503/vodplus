@@ -1,3 +1,26 @@
+# VODplus v0.9.49 - Instant Playback & Weak-Network Anti-Stall Optimization (秒开起播与弱网防卡顿优化)
+
+## Features & Performance
+- **全链路 HLS 秒开预热 (`src/lib/hls-prefetch.ts`)**:
+  - 新增 `injectPreconnect()` 与 CORS 兼容的 `prefetchHlsStream()`，在卡片 hover/touch 与播放页挂载期间与 `VideoPlayer` / `hls.js` Chunk 并行预取 `.m3u8` 清单、Master 自适应子档位、`#EXT-X-KEY`、`#EXT-X-MAP` 及精确匹配 `startPosition`（续播/跳过片头）的首个目标切片，替代原先无法复用的 `no-cors` 预取。
+  - 新增 `createPrefetchLoaders()` 通过 `pLoader` / `fLoader` 注入，命中预取缓存或复用 in-flight 请求实现 0ms 交付，未命中回退原生 `FetchLoader` 以保留 `progressive: true` 边下边播。
+- **实时网络感知、带宽持久化与 CDN 线路打分 (`src/lib/network-monitor.ts`)**:
+  - 结合 Network Information API 与持久化 EWMA 实测带宽（`VOD_BW_ESTIMATE_V1`），动态计算网络等级（`poor` / `fair` / `good`）及两阶段自适应缓冲目标；按 CDN 域名持久化记录延迟与失败惩罚（`VOD_CDN_PERF_V1`），支持 `rankLineOrder()` 优先调度更优线路。
+- **HLS 起播与弱网 ABR/超时调优 (`src/hooks/player/useHlsSource.ts`, `src/config/config.ts`)**:
+  - 分离首包 TTFB 超时（`HLS_TTFB_TIMEOUT: 6000`）与分片最大下载上限（`HLS_FRAG_MAX_LOAD_TIME: 45000`），避免弱网持续稳定下载中的分片在 8 秒时被误中断重下；支持 `startPosition` 直达目标分片起播，并按实测网络动态调整缓冲与 ABR 参数。
+- **弱网健康监控与起播兜底切换 (`src/hooks/player/usePlaybackHealth.ts`, `src/app/movie/[sourceId]/[id]/ClientPlayerWrapper.tsx`)**:
+  - 新增首帧起播挂起检测（`onStartupSlow`）与微缓冲空洞跳过（`tryJumpBufferHole()`）；通过分片在途下载字节增长检测区分“慢速下载中”与“真卡死”，避免误杀在途分片并优先降码率保流畅；弱网起播卡住时自动切换测速更优的可用备用源。
+
+## Bug Fixes
+- 修复 `SearchResults.tsx` 悬停预取调用 `/api/vod/latest` 而非 `/api/vod/detail` 的问题。
+- 区分用户显式缓冲配置（`VOD_BUFFER_USER_SET`）与弱网自适应运行时缓冲，防止弱网策略覆盖用户手动设置的 `localStorage.VOD_MAX_BUFFER_LENGTH`。
+- 下一集预热（`useVideoEvents.ts`）增加当前缓冲充足判断与 `saveData` 避让，防止弱网下后台预热抢占当前播放带宽。
+
+## Verification
+- `npx tsc --noEmit` 0 errors；`npm run build` 构建通过；新增模块通过节点运行时单元测试校验（`ALL_VERIFICATION_CHECKS_PASSED`）。
+
+---
+
 # VODplus v0.9.48 - Mobile Full-Screen Search Overlay & Lint/Rule Fix (移动端全屏搜索浮层)
 
 ## Features

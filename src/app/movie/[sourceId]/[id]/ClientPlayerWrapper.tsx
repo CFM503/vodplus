@@ -10,9 +10,20 @@ import { RESOURCE_SITES } from '@/lib/resources';
 import { readCustomSourcesFromDocument } from '@/lib/sourceConfig';
 import { isNameMatch } from '@/lib/nameMatch';
 import { CONFIG } from '@/config/config';
+import { prefetchHlsStream } from '@/lib/hls-prefetch';
+import { preloadHlsConstructor } from '@/hooks/player/useHlsSource';
+import { getProgressKey } from '@/lib/player-utils';
+import { getNetworkSnapshot, rankLineOrder, recordSourcePenalty, recordSourceSuccess } from '@/lib/network-monitor';
+
+// 模块加载即并行预热 VideoPlayer 与 hls.js 分包，消除串行等待瀑布流
+const loadVideoPlayer = () => import('@/components/VideoPlayer').then((mod) => mod.default);
+if (typeof window !== 'undefined') {
+  void loadVideoPlayer();
+  void preloadHlsConstructor();
+}
 
 const VideoPlayer = dynamic(
-  () => import('@/components/VideoPlayer').then((mod) => mod.default),
+  loadVideoPlayer,
   {
     loading: () => (
       <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden">
@@ -75,15 +86,42 @@ export default function ClientPlayerWrapper({
     const hasPrev = currentEpIndex > 0;
     const hasNext = currentEpIndex < episodes.length - 1;
 
+    // 播放页就绪瞬间立即预拉取当前集 .m3u8 与首片分片 (先于 dynamic VideoPlayer & hls.js 就绪)
+    useEffect(() => {
+        if (!currentEp?.url) return;
+        let startPos = pendingSeekTime && pendingSeekTime > 5 ? pendingSeekTime : 0;
+        if (!startPos && typeof window !== 'undefined') {
+            const saved = localStorage.getItem(getProgressKey(currentEp.url));
+            const parsed = saved ? parseFloat(saved) : 0;
+            if (Number.isFinite(parsed) && parsed > 5) {
+                startPos = parsed;
+            } else {
+                const skip = localStorage.getItem('VOD_SKIP_INTRO');
+                const parsedSkip = skip ? parseInt(skip, 10) : 0;
+                if (Number.isFinite(parsedSkip) && parsedSkip > 0) startPos = parsedSkip;
+            }
+        }
+        prefetchHlsStream(currentEp.url, {
+            priority: 'high',
+            prefetchSegments: 2,
+            startPosition: startPos,
+        }).catch(() => { /* ignore */ });
+    }, [currentEp?.url, pendingSeekTime]);
+
     const handleTimeUpdate = useCallback((c: number, _d: number, p: boolean) => {
         playbackStateRef.current = { currentTime: c, isPlaying: p };
     }, []);
+
+    // 控制跨源检索触发时机：首帧起播后再检索（保护起播带宽），若起播超过 3.5s 卡住则立即触发救援检索
+    const startMatchFnRef = useRef<(() => void) | null>(null);
+    const pendingAutoSwitchRef = useRef(false);
 
     // Asynchronous client-side cross-source search (fan-out pattern with bandwidth yielding & batching)
     useEffect(() => {
         if (!movieName) return;
 
         let isMounted = true;
+        let matchStarted = false;
         // v0.9.31: 换源匹配包含用户自定义源 (Cookie 中的 VOD_CUSTOM_SOURCES)
         const targetSites = [...RESOURCE_SITES, ...readCustomSourcesFromDocument()].filter(s => s.id !== initialSourceId);
         if (targetSites.length === 0) return;
@@ -113,18 +151,21 @@ export default function ClientPlayerWrapper({
             }, 300); // 300ms batch throttle
         };
 
-        // Yield bandwidth to HLS player startup for 1.8s
-        startTimeoutId = setTimeout(() => {
-            if (!isMounted) return;
+        const runMatch = () => {
+            if (!isMounted || matchStarted) return;
+            matchStarted = true;
+            if (startTimeoutId) {
+                clearTimeout(startTimeoutId);
+                startTimeoutId = null;
+            }
             setIsMatching(true);
 
+            const snap = getNetworkSnapshot();
             let limit = CONFIG.CLIENT_MATCH_CONCURRENCY || 3;
-            // Adaptively reduce concurrency on weak networks or data saver mode
-            if (typeof navigator !== 'undefined' && 'connection' in navigator) {
-                const conn = (navigator as any).connection;
-                if (conn && (conn.effectiveType === '2g' || conn.effectiveType === '3g' || conn.saveData)) {
-                    limit = 1;
-                }
+            if (snap.tier === 'poor' || snap.saveData) {
+                limit = 1;
+            } else if (snap.tier === 'fair') {
+                limit = 2;
             }
 
             const queue = [...targetSites];
@@ -182,10 +223,15 @@ export default function ClientPlayerWrapper({
                     setIsMatching(false);
                 }
             });
-        }, 1800);
+        };
+
+        startMatchFnRef.current = runMatch;
+        // 兜底定时器：最迟 3.5s 启动（避免首帧已播或卡顿时无限等待）
+        startTimeoutId = setTimeout(runMatch, 3500);
 
         return () => {
             isMounted = false;
+            startMatchFnRef.current = null;
             if (startTimeoutId) clearTimeout(startTimeoutId);
             if (batchTimerId) clearTimeout(batchTimerId);
         };
@@ -320,29 +366,54 @@ export default function ClientPlayerWrapper({
     }, [currentSourceId, episodes, currentEpIndex, getSourceBaseUrl, showSwitchNotice]);
 
     // v0.9.25: 线路连续卡顿达到上限时, 自动切换到偏好表里更快/更稳的线路
-    // 偏好顺序来自实测 CDN 速度 (见 CONFIG.LINE_PREFERENCE), 避免在当前慢线 (如量子 EU 节点) 上反复缓冲
+    // 结合实时会话健康度评分 + CONFIG.LINE_PREFERENCE 智能排序
     const handleAutoSwitchLine = useCallback(() => {
-        if (!CONFIG.AUTO_SWITCH_LINE || allLines.length < 2) return;
+        if (!CONFIG.AUTO_SWITCH_LINE) return;
 
-        // 当前线路记为失败, 防止切回后乒乓
+        // 记录当前线路卡顿/失败惩罚，防止乒乓切换
         triedLinesRef.current.add(currentSourceId);
+        recordSourcePenalty(currentSourceId, currentEp?.url);
 
-        // 按偏好顺序排序: LINE_PREFERENCE 里的线路优先, 其余按原顺序追加
-        const knownIds = new Set(CONFIG.LINE_PREFERENCE);
-        const preferred = allLines.filter(l => knownIds.has(l.source_id));
-        const rest = allLines.filter(l => !knownIds.has(l.source_id));
-        const ordered = [...preferred, ...rest];
+        if (allLines.length < 2) {
+            // 若后台仍在检索备用线路，标记待切换，拿到首个候选源后立即救援
+            pendingAutoSwitchRef.current = true;
+            startMatchFnRef.current?.();
+            return;
+        }
 
-        // 找下一个未尝试过的线路 (且不是当前线路)
+        const ordered = rankLineOrder(allLines, CONFIG.LINE_PREFERENCE);
         const next = ordered.find(l => l.source_id !== currentSourceId && !triedLinesRef.current.has(l.source_id));
         if (!next) {
+            pendingAutoSwitchRef.current = false;
             showSwitchNotice('所有线路都已尝试，仍无法流畅播放');
             return;
         }
 
+        pendingAutoSwitchRef.current = false;
         showSwitchNotice(`当前线路卡顿，已自动切换到「${next.source_name}」`);
         handleSwitchSource(next);
-    }, [allLines, currentSourceId, handleSwitchSource, showSwitchNotice]);
+    }, [allLines, currentSourceId, currentEp?.url, handleSwitchSource, showSwitchNotice]);
+
+    // 若起播卡死时正在等待检索备用源，一旦拿到有效候选线路立即自动切换
+    useEffect(() => {
+        if (pendingAutoSwitchRef.current && allLines.length >= 2) {
+            handleAutoSwitchLine();
+        }
+    }, [allLines.length, handleAutoSwitchLine]);
+
+    const handlePlayerFirstFrame = useCallback(() => {
+        pendingAutoSwitchRef.current = false;
+        recordSourceSuccess(currentSourceId);
+        // 首帧成功渲染后延迟 300ms 启动备用线路检索，零抢占首片带宽
+        setTimeout(() => {
+            startMatchFnRef.current?.();
+        }, 300);
+    }, [currentSourceId]);
+
+    const handlePlayerStartupSlow = useCallback(() => {
+        // 起播缓慢或清单拉取失败时立即启动备用线路检索
+        startMatchFnRef.current?.();
+    }, []);
 
     const handleEpisodeEnd = useCallback(() => {
         setPendingSeekTime(undefined);
@@ -417,6 +488,8 @@ export default function ClientPlayerWrapper({
                         initialSeekTime={pendingSeekTime}
                         onTimeUpdate={handleTimeUpdate}
                         onGiveUp={handleAutoSwitchLine}
+                        onFirstFrame={handlePlayerFirstFrame}
+                        onStartupSlow={handlePlayerStartupSlow}
                     />
                 ) : (
                     <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-white/5">
@@ -519,12 +592,12 @@ export default function ClientPlayerWrapper({
                                 onClick={() => handleJumpToEpisode(idx)}
                                 onMouseEnter={() => {
                                     if (isNext && ep.url) {
-                                        fetch(ep.url, { priority: 'low', mode: 'no-cors' }).catch(() => {});
+                                        prefetchHlsStream(ep.url, { priority: 'low', prefetchSegments: 1, skipIfSaveData: true }).catch(() => {});
                                     }
                                 }}
                                 onTouchStart={() => {
                                     if (isNext && ep.url) {
-                                        fetch(ep.url, { priority: 'low', mode: 'no-cors' }).catch(() => {});
+                                        prefetchHlsStream(ep.url, { priority: 'low', prefetchSegments: 1, skipIfSaveData: true }).catch(() => {});
                                     }
                                 }}
                                 className={cn(

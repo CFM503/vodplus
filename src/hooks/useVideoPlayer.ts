@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { CONFIG } from '@/config/config';
 import { formatTime, getProgressKey } from '@/lib/player-utils';
 import { useHlsSource } from '@/hooks/player/useHlsSource';
@@ -19,6 +19,8 @@ interface VideoPlayerProps {
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
     // v0.9.25: 线路连续卡顿达到上限时的回调 (自动切换线路)
     onGiveUp?: () => void;
+    onFirstFrame?: () => void;
+    onStartupSlow?: () => void;
 }
 
 interface GestureHUDState {
@@ -32,7 +34,7 @@ interface ToastState {
     visible: boolean;
 }
 
-export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp }: VideoPlayerProps) {
+export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp, onFirstFrame, onStartupSlow }: VideoPlayerProps) {
     // ===========================
     // Shared Refs
     // ===========================
@@ -55,26 +57,22 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         }
         return 1;
     });
+    const [hasUserBufferOverride, setHasUserBufferOverride] = useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("VOD_BUFFER_USER_SET") === "1";
+        }
+        return false;
+    });
     const [maxBufferLength, setMaxBufferLength] = useState(() => {
         if (typeof window !== "undefined") {
-            // 1. 优先检测当前网络状况是否为弱网或省流，以实施积极的主动降级（防止旧的历史大缓冲区撑爆弱网信道）
-            if ('connection' in navigator) {
-                const conn = (navigator as any).connection;
-                if (conn) {
-                    if (conn.effectiveType === '2g' || conn.effectiveType === '3g') {
-                        return 8; // 弱网强制使用 8s 短缓冲，防止切片下载队列积压
-                    }
-                    if (conn.saveData) {
-                        return 10; // 省流模式强制使用 10s 短缓冲
-                    }
-                }
-            }
-
-            // 2. 只有在网速良好时，才应用 localStorage 保存的历史大缓冲设置
             const saved = localStorage.getItem("VOD_MAX_BUFFER_LENGTH");
-            if (saved) return parseInt(saved, 10);
+            const userSet = localStorage.getItem("VOD_BUFFER_USER_SET") === "1";
+            if (saved && userSet) {
+                const parsed = parseInt(saved, 10);
+                if (Number.isFinite(parsed) && parsed >= 10) return parsed;
+            }
         }
-        return CONFIG.DEFAULT_BUFFER_LENGTH || 15;
+        return CONFIG.DEFAULT_BUFFER_LENGTH || 20;
     });
     const [videoScale, setVideoScale] = useState(() => {
         if (typeof window !== "undefined") {
@@ -152,12 +150,34 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         setIsSpeedHolding(false);
     }, [playbackRate]);
 
+    // 预先计算起播秒数 (切源记忆进度 > 本地历史进度 > 跳过片头)，使 hls.js 首片直达目标时间戳，避免浪费第 0 片流量
+    const initialStartPosition = useMemo(() => {
+        if (initialSeekTime && initialSeekTime > 5) return initialSeekTime;
+        if (typeof window !== "undefined" && url) {
+            const saved = localStorage.getItem(getProgressKey(url));
+            const parsed = saved ? parseFloat(saved) : 0;
+            if (Number.isFinite(parsed) && parsed > 5) return parsed;
+        }
+        return skipIntroTimeRef.current > 0 ? skipIntroTimeRef.current : 0;
+    }, [url, initialSeekTime]);
+
     // ===========================
     // Sub-hooks (called in dependency order)
     // ===========================
 
     // 1. HLS Source
-    const hlsSource = useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef, showToast });
+    const hlsSource = useHlsSource({
+        url,
+        videoRef,
+        isEmbed,
+        maxBufferLength,
+        hasUserBufferOverride,
+        initialStartPosition,
+        skipIntroTimeRef,
+        showToast,
+        onFirstFrame,
+        onStartupSlow,
+    });
 
     // 2. Settings
     const settings = useVideoSettings({
@@ -175,12 +195,19 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
         setMaxBufferLength,
     });
 
-    // 2.5 Playback Health (stall detection + auto-skip)
+    // 2.5 Playback Health (stall detection + auto-skip + startup rescue)
     const { resetSkipCount: resetStallSkipCount } = usePlaybackHealth({
         videoRef,
         hlsRef: hlsSource.hlsRef,
         showToast,
         onGiveUp,
+        onStartupSlow,
+        isLoading: hlsSource.isLoading,
+        autoplay,
+        userPausedRef,
+        hasStartedPlayingRef: hlsSource.hasStartedPlayingRef,
+        lastNetworkActivityRef: hlsSource.lastNetworkActivityRef,
+        activeFragStatsRef: hlsSource.activeFragStatsRef,
     });
 
     // Reset skip count when URL changes (new video source)
@@ -301,10 +328,11 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
     }, [playbackRate]);
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && hasUserBufferOverride) {
+            localStorage.setItem("VOD_BUFFER_USER_SET", "1");
             localStorage.setItem("VOD_MAX_BUFFER_LENGTH", maxBufferLength.toString());
         }
-    }, [maxBufferLength]);
+    }, [maxBufferLength, hasUserBufferOverride]);
 
     // Progress recovery and Skip intro effect
     const hasRestoredProgressRef = useRef(false);
@@ -320,12 +348,18 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
             if (hasRestoredProgressRef.current) return;
             hasRestoredProgressRef.current = true;
 
+            const seekIfNeeded = (targetTime: number) => {
+                if (Math.abs(video.currentTime - targetTime) > 2.5) {
+                    video.currentTime = targetTime;
+                }
+            };
+
             // 1. 切源记忆进度最高优先级
             if (initialSeekTime && initialSeekTime > 5) {
                 const maxSeek = video.duration ? Math.max(0, video.duration - 1) : initialSeekTime;
                 const targetTime = Math.min(initialSeekTime, maxSeek);
                 if (targetTime > 0) {
-                    video.currentTime = targetTime;
+                    seekIfNeeded(targetTime);
                     showToast(`已为您恢复切源播放进度：${formatTime(targetTime)}`);
                     hlsSource.hasSkippedIntroRef.current = true;
                     return;
@@ -337,17 +371,21 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
             const savedTimeStr = localStorage.getItem(key);
             const savedTime = savedTimeStr ? parseFloat(savedTimeStr) : 0;
 
-            if (savedTime > 5 && savedTime < video.duration - 5) {
-                video.currentTime = savedTime;
+            if (savedTime > 5 && (!Number.isFinite(video.duration) || savedTime < video.duration - 5)) {
+                seekIfNeeded(savedTime);
                 showToast(`已为您恢复播放进度：${formatTime(savedTime)}`);
                 // 标记已跳过片头，防止再次触发跳过片头导致进度被覆盖
                 hlsSource.hasSkippedIntroRef.current = true;
             } else {
+                // 若此前 startPosition 跳到了无效结尾位置，回退到开头或片头之后
+                if (savedTime > 5 && Number.isFinite(video.duration) && savedTime >= video.duration - 5 && video.currentTime >= video.duration - 6) {
+                    video.currentTime = 0;
+                }
                 // 如果没有保存进度，且片头秒数大于0且尚未跳过，则执行跳过片头逻辑
                 const target = skipIntroTimeRef.current;
                 if (target > 0 && !hlsSource.hasSkippedIntroRef.current) {
                     hlsSource.hasSkippedIntroRef.current = true;
-                    video.currentTime = target;
+                    seekIfNeeded(target);
                     showToast(`已为您跳过片头 ${target}s`);
                 } else {
                     hlsSource.hasSkippedIntroRef.current = true;
@@ -388,6 +426,7 @@ export function useVideoPlayer({ url, onEnded, autoplay = false, nextEpisodeUrl,
 
     // Wiring: buffer change → orchestrator maxBufferLength
     const handleBufferChangeWired = useCallback((buf: number) => {
+        setHasUserBufferOverride(true);
         setMaxBufferLength(buf);
         settings.handleBufferChange(buf);
     }, [settings.handleBufferChange]);

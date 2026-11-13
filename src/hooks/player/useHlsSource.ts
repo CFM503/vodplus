@@ -1,15 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import type Hls from 'hls.js';
+import type { LoaderStats } from 'hls.js';
 import { CONFIG } from '@/config/config';
 import { logger } from '@/lib/logger';
 import { isDirectPlayableUrl } from '@/lib/vodParser';
+import { createPrefetchLoaders, injectPreconnect } from '@/lib/hls-prefetch';
+import {
+    getAdaptiveBufferTarget,
+    getInitialBandwidthEstimate,
+    getNetworkSnapshot,
+    recordTransferSample,
+    subscribeNetworkChange,
+} from '@/lib/network-monitor';
 
 // Cache the HLS constructor across URL changes to avoid re-importing
 let cachedHlsConstructor: typeof Hls | null = null;
 let hlsImportPromise: Promise<typeof Hls> | null = null;
 
-async function getHlsConstructor(): Promise<typeof Hls> {
-    if (cachedHlsConstructor) return cachedHlsConstructor;
+export function preloadHlsConstructor(): Promise<typeof Hls> {
+    if (cachedHlsConstructor) return Promise.resolve(cachedHlsConstructor);
     if (!hlsImportPromise) {
         hlsImportPromise = import('hls.js').then(mod => {
             cachedHlsConstructor = mod.default;
@@ -24,14 +33,32 @@ interface UseHlsSourceProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
     isEmbed: boolean;
     maxBufferLength: number;
+    hasUserBufferOverride?: boolean;
+    initialStartPosition?: number;
     skipIntroTimeRef: React.RefObject<number>;
     showToast?: (message: string) => void;
+    onFirstFrame?: () => void;
+    onStartupSlow?: () => void;
 }
 
-export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntroTimeRef, showToast }: UseHlsSourceProps) {
+export function useHlsSource({
+    url,
+    videoRef,
+    isEmbed,
+    maxBufferLength,
+    hasUserBufferOverride = false,
+    initialStartPosition,
+    skipIntroTimeRef,
+    showToast,
+    onFirstFrame,
+    onStartupSlow,
+}: UseHlsSourceProps) {
     const hlsRef = useRef<InstanceType<typeof Hls> | null>(null);
     const hasSkippedIntroRef = useRef(false);
     const hasPrefetchedNextRef = useRef(false);
+    const hasStartedPlayingRef = useRef(false);
+    const lastNetworkActivityRef = useRef<number>(Date.now());
+    const activeFragStatsRef = useRef<LoaderStats | null>(null);
 
     const [isLoading, setIsLoading] = useState(true);
     const [levels, setLevels] = useState<{ height: number; index: number }[]>([]);
@@ -44,42 +71,93 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
     // 每个 URL 只提示一次致命错误，避免重试循环刷屏
     const errorNotifiedRef = useRef(false);
 
+    // 保持最新回调引用，避免因外部回调重建而重跑 HLS 初始化
+    const onFirstFrameRef = useRef(onFirstFrame);
+    onFirstFrameRef.current = onFirstFrame;
+    const onStartupSlowRef = useRef(onStartupSlow);
+    onStartupSlowRef.current = onStartupSlow;
+    const maxBufferLengthRef = useRef(maxBufferLength);
+    maxBufferLengthRef.current = maxBufferLength;
+    const hasUserBufferOverrideRef = useRef(hasUserBufferOverride);
+    hasUserBufferOverrideRef.current = hasUserBufferOverride;
+    const initialStartPositionRef = useRef(initialStartPosition);
+    initialStartPositionRef.current = initialStartPosition;
+
     // Reset flags on URL change
     useEffect(() => {
         hasPrefetchedNextRef.current = false;
         hasSkippedIntroRef.current = false;
+        hasStartedPlayingRef.current = false;
         manifestParsedRef.current = false;
         mediaAttachedRef.current = false;
         errorNotifiedRef.current = false;
+        activeFragStatsRef.current = null;
+        lastNetworkActivityRef.current = Date.now();
     }, [url]);
 
     // HLS initialization
     useEffect(() => {
+        let cancelled = false;
         setIsLoading(true);
         setLevels([]);
         setCurrentLevel(-1);
         setActiveLevelIdx(-1);
         hasSkippedIntroRef.current = false;
+        hasStartedPlayingRef.current = false;
         manifestParsedRef.current = false;
         mediaAttachedRef.current = false;
+        activeFragStatsRef.current = null;
+        lastNetworkActivityRef.current = Date.now();
 
         const video = videoRef.current;
         if (!video || isEmbed) return;
 
+        const applyAdaptiveBufferConfig = (hls: InstanceType<typeof Hls>) => {
+            const snapshot = getNetworkSnapshot();
+            const basePref = maxBufferLengthRef.current;
+            const target = hasUserBufferOverrideRef.current || !CONFIG.BUFFER_ADAPTIVE
+                ? (snapshot.saveData ? Math.min(basePref, 10) : basePref)
+                : getAdaptiveBufferTarget(
+                    basePref,
+                    hasStartedPlayingRef.current,
+                    snapshot,
+                    CONFIG.BUFFER_HIGH_BW
+                );
+
+            hls.config.maxBufferLength = target;
+            hls.config.maxMaxBufferLength = Math.max(target * 2, 30);
+            const calculatedSize = target * 2 * 1024 * 1024;
+            hls.config.maxBufferSize = Math.min(100 * 1024 * 1024, Math.max(30 * 1024 * 1024, calculatedSize));
+        };
+
+        const handleVideoPlaying = () => {
+            if (!hasStartedPlayingRef.current) {
+                hasStartedPlayingRef.current = true;
+                if (hlsRef.current) {
+                    applyAdaptiveBufferConfig(hlsRef.current);
+                }
+                onFirstFrameRef.current?.();
+            }
+        };
+        video.addEventListener('playing', handleVideoPlaying);
+
         const initPlayer = async () => {
             if (!url) return;
+            const cleanUrl = url.trim();
             // 清理上一 URL 可能残留的原生 onerror，避免误报
             video.onerror = null;
 
             // 非直链（云播/解析页/无扩展名接口）不进入 HLS，给出明确提示而不是黑屏
-            if (!isDirectPlayableUrl(url)) {
+            if (!isDirectPlayableUrl(cleanUrl)) {
                 showToast?.('该播放地址不是直链（仅支持 m3u8/mp4/webm），请切换线路');
                 setIsLoading(false);
                 return;
             }
 
-            if (url.includes('.mp4') || url.includes('.webm')) {
-                video.src = url;
+            injectPreconnect(cleanUrl);
+
+            if (cleanUrl.includes('.mp4') || cleanUrl.includes('.webm')) {
+                video.src = cleanUrl;
                 video.onerror = () => {
                     setIsLoading(false);
                     if (!errorNotifiedRef.current) {
@@ -92,50 +170,90 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
             }
 
             try {
-                const Hls = await getHlsConstructor();
+                const Hls = await preloadHlsConstructor();
+                if (cancelled) return;
 
                 if (Hls.isSupported()) {
                     if (hlsRef.current) hlsRef.current.destroy();
 
-                    // Calculate and bound maxBufferSize dynamically based on maxBufferLength:
-                    // - Base minimum: 30MB, Proportional scaling: 2MB/s, Ceiling: 100MB
-                    const initialCalculatedSize = maxBufferLength * 2 * 1024 * 1024;
+                    const snapshot = getNetworkSnapshot();
+                    const initialTargetBuf = hasUserBufferOverrideRef.current || !CONFIG.BUFFER_ADAPTIVE
+                        ? (snapshot.saveData ? Math.min(maxBufferLengthRef.current, 10) : maxBufferLengthRef.current)
+                        : getAdaptiveBufferTarget(maxBufferLengthRef.current, false, snapshot, CONFIG.BUFFER_HIGH_BW);
+                    const initialCalculatedSize = initialTargetBuf * 2 * 1024 * 1024;
                     const initialBoundedSize = Math.min(100 * 1024 * 1024, Math.max(30 * 1024 * 1024, initialCalculatedSize));
+
+                    const { pLoader, fLoader } = createPrefetchLoaders();
+                    const startPos = initialStartPositionRef.current;
 
                     const hls = new Hls({
                         capLevelToPlayerSize: true,
                         autoStartLoad: true,
+                        startPosition: typeof startPos === 'number' && startPos > 5 ? startPos : -1,
                         startLevel: -1,
                         enableWorker: true,
-                        maxBufferLength: CONFIG.BUFFER_ADAPTIVE ? Math.min(maxBufferLength, CONFIG.BUFFER_HIGH_BW) : maxBufferLength,
-                        maxMaxBufferLength: maxBufferLength * 2,
+                        pLoader,
+                        fLoader,
+                        // 使用 FetchLoader + credentials: 'omit' 保留渐进式分片流式写入 (progressive)
+                        fetchSetup: (context, initParams) => new Request(context.url, {
+                            ...initParams,
+                            credentials: 'omit',
+                        }),
+                        maxBufferLength: initialTargetBuf,
+                        maxMaxBufferLength: Math.max(initialTargetBuf * 2, 30),
                         maxBufferSize: initialBoundedSize,
-                        backBufferLength: 60,
+                        backBufferLength: snapshot.tier === 'poor' ? 30 : 60,
                         lowLatencyMode: false,
-                        manifestLoadingTimeOut: CONFIG.HLS_TIMEOUT,
-                        manifestLoadingMaxRetry: 4,
-                        manifestLoadingRetryDelay: 500,
-                        levelLoadingTimeOut: CONFIG.HLS_TIMEOUT,
-                        levelLoadingMaxRetry: 4,
-                        levelLoadingRetryDelay: 500,
-                        fragLoadingTimeOut: CONFIG.HLS_FRAGMENT_TRY_TIMEOUT || 8000,
-                        fragLoadingMaxRetry: 6,
-                        fragLoadingRetryDelay: 800,
+                        // 分离 TTFB 与总下载时长：坏节点 5-6s TTFB 快速失败，慢速但持续传输的分片给足 45s 完整下载
+                        manifestLoadPolicy: {
+                            default: {
+                                maxTimeToFirstByteMs: CONFIG.HLS_TIMEOUT || 5000,
+                                maxLoadTimeMs: 12000,
+                                timeoutRetry: { maxNumRetry: 3, retryDelayMs: 300, maxRetryDelayMs: 2000, backoff: 'exponential' },
+                                errorRetry: { maxNumRetry: 3, retryDelayMs: 400, maxRetryDelayMs: 2500, backoff: 'exponential' },
+                            },
+                        },
+                        playlistLoadPolicy: {
+                            default: {
+                                maxTimeToFirstByteMs: CONFIG.HLS_TIMEOUT || 5000,
+                                maxLoadTimeMs: 12000,
+                                timeoutRetry: { maxNumRetry: 3, retryDelayMs: 300, maxRetryDelayMs: 2000, backoff: 'exponential' },
+                                errorRetry: { maxNumRetry: 4, retryDelayMs: 400, maxRetryDelayMs: 3000, backoff: 'exponential' },
+                            },
+                        },
+                        fragLoadPolicy: {
+                            default: {
+                                maxTimeToFirstByteMs: CONFIG.HLS_TTFB_TIMEOUT || 6000,
+                                maxLoadTimeMs: CONFIG.HLS_FRAG_MAX_LOAD_TIME || 45000,
+                                timeoutRetry: { maxNumRetry: 4, retryDelayMs: 400, maxRetryDelayMs: 4000, backoff: 'exponential' },
+                                errorRetry: { maxNumRetry: 6, retryDelayMs: 500, maxRetryDelayMs: 5000, backoff: 'exponential' },
+                            },
+                        },
+                        keyLoadPolicy: {
+                            default: {
+                                maxTimeToFirstByteMs: CONFIG.HLS_TTFB_TIMEOUT || 6000,
+                                maxLoadTimeMs: 12000,
+                                timeoutRetry: { maxNumRetry: 3, retryDelayMs: 300, maxRetryDelayMs: 2000, backoff: 'linear' },
+                                errorRetry: { maxNumRetry: 5, retryDelayMs: 400, maxRetryDelayMs: 3000, backoff: 'linear' },
+                            },
+                        },
                         startFragPrefetch: true,
                         progressive: true,
                         maxBufferHole: 0.5,
+                        nudgeOffset: 0.15,
+                        nudgeMaxRetry: 5,
+                        nudgeOnVideoHole: true,
                         highBufferWatchdogPeriod: 2.0,
                         testBandwidth: false,
-                        // 晚高峰 ABR 灵敏度与保守系数优化：
-                        // 初始预估 1.2 Mbps，防止起播拉取超大分片导致首屏过慢
-                        abrEwmaDefaultEstimate: 1200000,
-                        // 加快带宽下降感知，延迟带宽上升判定，防范晚高峰网络抖动造成的反复缓冲
+                        // 基于历史实测与网络接口的初始带宽估计，防范首片过重导致的起播慢
+                        abrEwmaDefaultEstimate: getInitialBandwidthEstimate(),
                         abrEwmaFastVoD: 1.5,
                         abrEwmaSlowVoD: 4.0,
-                        // 80% 安全带宽估算，为网络抖动预留安全余量
-                        abrBandWidthFactor: 0.8,
+                        abrBandWidthFactor: 0.72,
+                        abrBandWidthUpFactor: 0.55,
                         abrMaxWithRealBitrate: true,
-                        maxStarvationDelay: 4,
+                        maxStarvationDelay: 2,
+                        maxLoadingDelay: 3,
                         appendErrorMaxRetry: 4,
                         xhrSetup: function (xhr: XMLHttpRequest) {
                             xhr.withCredentials = false;
@@ -143,7 +261,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                     });
                     hlsRef.current = hls;
 
-                    hls.loadSource(url.trim());
+                    hls.loadSource(cleanUrl);
 
                     // 辅助：两个事件都就绪后才设置 isLoading=false
                     const tryFinishLoading = () => {
@@ -152,7 +270,12 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         }
                     };
 
+                    hls.on(Hls.Events.MANIFEST_LOADED, () => {
+                        lastNetworkActivityRef.current = Date.now();
+                    });
+
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        lastNetworkActivityRef.current = Date.now();
                         const availableLevels = hls.levels.map((l: { height: number }, idx: number) => ({
                             height: l.height,
                             index: idx
@@ -160,6 +283,38 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         setLevels(availableLevels);
                         manifestParsedRef.current = true;
                         tryFinishLoading();
+                    });
+
+                    hls.on(Hls.Events.LEVEL_LOADED, () => {
+                        lastNetworkActivityRef.current = Date.now();
+                    });
+
+                    hls.on(Hls.Events.KEY_LOADED, () => {
+                        lastNetworkActivityRef.current = Date.now();
+                    });
+
+                    hls.on(Hls.Events.FRAG_LOADING, (_: unknown, data) => {
+                        lastNetworkActivityRef.current = Date.now();
+                        activeFragStatsRef.current = data.frag.loader?.stats || data.frag.stats || null;
+                    });
+
+                    hls.on(Hls.Events.FRAG_LOADED, (_: unknown, data) => {
+                        lastNetworkActivityRef.current = Date.now();
+                        const stats = data.frag.stats;
+                        if (stats && stats.loaded > 0 && stats.loading.end > stats.loading.start) {
+                            const durationMs = stats.loading.end - stats.loading.start;
+                            const ttfbMs = stats.loading.first > stats.loading.start
+                                ? stats.loading.first - stats.loading.start
+                                : undefined;
+                            recordTransferSample(data.frag.url || cleanUrl, stats.loaded, durationMs, ttfbMs);
+                        }
+                        if (hasStartedPlayingRef.current) {
+                            applyAdaptiveBufferConfig(hls);
+                        }
+                    });
+
+                    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                        lastNetworkActivityRef.current = Date.now();
                     });
 
                     hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -184,10 +339,13 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         }
                     };
 
-                    hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string }) => {
+                    hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal: boolean; type: string; details?: string }) => {
                         if (!data.fatal) return;
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
+                                if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR || data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT) {
+                                    onStartupSlowRef.current?.();
+                                }
                                 if (!errorNotifiedRef.current) {
                                     errorNotifiedRef.current = true;
                                     showToast?.('网络异常，正在重试连接…');
@@ -195,9 +353,6 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                                 hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                // v0.9.28: recoverMediaError() 内部会 detach→attach→media.load(),
-                                // 按规范 media.load() 会把视频置为暂停, 而 hls.js 不会自动 play() 续播,
-                                // 所以恢复前若是播放中, 需要手动 resume, 否则视频会停在暂停态
                                 if (!errorNotifiedRef.current) {
                                     errorNotifiedRef.current = true;
                                     showToast?.('视频数据错误，正在尝试恢复…');
@@ -222,7 +377,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
                         }
                     });
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = url;
+                    video.src = cleanUrl;
                     video.addEventListener('loadedmetadata', () => {
                         setIsLoading(false);
                     }, { once: true });
@@ -230,7 +385,7 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
             } catch (error: unknown) {
                 logger.error('VideoPlayer', 'Failed to load Hls.js', error);
                 if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = url;
+                    video.src = cleanUrl;
                     video.addEventListener('loadedmetadata', () => {
                         setIsLoading(false);
                     }, { once: true });
@@ -239,6 +394,17 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         };
 
         initPlayer();
+
+        // 实时监听网络状态波动 (如 WiFi 切 4G 或信号变差): 动态扩容缓冲并降级自动码率上限
+        const unsubscribeNet = subscribeNetworkChange(() => {
+            const hls = hlsRef.current;
+            if (!hls) return;
+            applyAdaptiveBufferConfig(hls);
+            const snap = getNetworkSnapshot();
+            if (snap.tier === 'poor' && hls.currentLevel === -1 && hls.levels.length > 1) {
+                hls.nextAutoLevel = Math.max(0, Math.min(hls.nextAutoLevel, 0));
+            }
+        });
 
         // Visibility handling — tied to HLS lifecycle to avoid listener accumulation
         const handleVisibilityChange = () => {
@@ -256,6 +422,9 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
+            cancelled = true;
+            unsubscribeNet();
+            video.removeEventListener('playing', handleVideoPlaying);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (hlsRef.current) {
                 hlsRef.current.destroy();
@@ -264,22 +433,23 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         };
     }, [url, isEmbed]);
 
-    // Update HLS buffer config dynamically
+    // Update HLS buffer config dynamically when user changes buffer setting
     useEffect(() => {
         if (!hlsRef.current || isEmbed) return;
 
         const hls = hlsRef.current;
-        (hls.config as any).maxBufferLength = maxBufferLength;
-        (hls.config as any).maxMaxBufferLength = maxBufferLength * 2;
-        
-        // Link maxBufferSize dynamically with maxBufferLength:
-        // - Base minimum: 30MB (to ensure high-bitrate playback is smooth)
-        // - Proportional scaling: 2MB per second of buffer length
-        // - Safe upper ceiling: 100MB (to prevent out-of-memory crashes on mobile/low-end devices)
-        const calculatedSize = maxBufferLength * 2 * 1024 * 1024;
+        const snapshot = getNetworkSnapshot();
+        const effectiveTarget = hasUserBufferOverride || !CONFIG.BUFFER_ADAPTIVE
+            ? (snapshot.saveData ? Math.min(maxBufferLength, 10) : maxBufferLength)
+            : getAdaptiveBufferTarget(maxBufferLength, hasStartedPlayingRef.current, snapshot, CONFIG.BUFFER_HIGH_BW);
+
+        hls.config.maxBufferLength = effectiveTarget;
+        hls.config.maxMaxBufferLength = Math.max(effectiveTarget * 2, 30);
+
+        const calculatedSize = effectiveTarget * 2 * 1024 * 1024;
         const boundedSize = Math.min(100 * 1024 * 1024, Math.max(30 * 1024 * 1024, calculatedSize));
-        (hls.config as any).maxBufferSize = boundedSize;
-    }, [maxBufferLength, isEmbed]);
+        hls.config.maxBufferSize = boundedSize;
+    }, [maxBufferLength, hasUserBufferOverride, isEmbed]);
 
     return {
         hlsRef,
@@ -291,5 +461,8 @@ export function useHlsSource({ url, videoRef, isEmbed, maxBufferLength, skipIntr
         maxBufferLength,
         hasSkippedIntroRef,
         hasPrefetchedNextRef,
+        hasStartedPlayingRef,
+        lastNetworkActivityRef,
+        activeFragStatsRef,
     };
 }

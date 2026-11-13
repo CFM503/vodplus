@@ -151,8 +151,8 @@ export function SearchResults({ keyword, activeSources }: SearchResultsProps) {
             hasPrefetchedTopResult.current = keyword;
             const topResult = results[0];
             if (topResult.source_id && topResult.vod_id) {
-                // 用最低优先级静默抓取
-                fetch(`/api/vod/latest?source=${encodeURIComponent(topResult.source_id)}&id=${encodeURIComponent(topResult.vod_id)}`, {
+                // 用最低优先级静默抓取详情，预热 Edge Cache 与播放地址
+                fetch(`/api/vod/detail?source=${encodeURIComponent(topResult.source_id)}&id=${encodeURIComponent(topResult.vod_id)}`, {
                     priority: 'low',
                     cache: 'force-cache'
                 }).catch(() => { });

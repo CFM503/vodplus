@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { getProgressKey } from '@/lib/player-utils';
+import { prefetchHlsStream } from '@/lib/hls-prefetch';
 
 interface UseVideoEventsProps {
     url: string;
@@ -146,22 +147,23 @@ export function useVideoEvents({
                     }
                 }
 
-                // Next Episode preload at 60% progress
+                // Next Episode preload at 65% progress (only when current buffer is healthy so weak networks aren't starved)
                 const nextUrl = nextEpisodeUrlRef.current;
-                if (nextUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 60) {
-                    hasPrefetchedNextRef.current = true;
-                    fetch(nextUrl, { mode: 'no-cors', priority: 'low' }).catch(() => { /* ignore */ });
-
-                    if ('connection' in navigator) {
-                        const conn = (navigator as { connection?: { effectiveType?: string } }).connection;
-                        if (!conn || conn.effectiveType === '4g' || conn.effectiveType === '3g') {
-                            const link = document.createElement('link');
-                            link.rel = 'prefetch';
-                            link.href = nextUrl;
-                            link.as = 'fetch';
-                            link.crossOrigin = 'anonymous';
-                            document.head.appendChild(link);
+                if (nextUrl && !hasPrefetchedNextRef.current && currentProgressPercent > 65) {
+                    let bufferedAhead = 0;
+                    for (let i = 0; i < video.buffered.length; i++) {
+                        if (video.buffered.start(i) <= video.currentTime + 0.5 && video.buffered.end(i) >= video.currentTime) {
+                            bufferedAhead = video.buffered.end(i) - video.currentTime;
+                            break;
                         }
+                    }
+                    if (bufferedAhead >= 8 || currentProgressPercent > 88) {
+                        hasPrefetchedNextRef.current = true;
+                        prefetchHlsStream(nextUrl, {
+                            priority: 'low',
+                            prefetchSegments: 1,
+                            skipIfSaveData: true,
+                        }).catch(() => { /* ignore */ });
                     }
                 }
             });

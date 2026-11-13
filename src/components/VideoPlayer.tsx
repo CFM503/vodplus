@@ -42,10 +42,12 @@ interface VideoPlayerProps {
     onTimeUpdate?: (currentTime: number, duration: number, isPlaying: boolean) => void;
     // v0.9.25: 线路连续卡顿达到上限时的回调 (自动切换线路)
     onGiveUp?: () => void;
+    onFirstFrame?: () => void;
+    onStartupSlow?: () => void;
 }
 
-function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp }: VideoPlayerProps) {
-    const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp });
+function VideoPlayer({ url, poster, title, onEnded, autoplay = false, onPrevEpisode, onNextEpisode, hasPrevEpisode = false, hasNextEpisode = false, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp, onFirstFrame, onStartupSlow }: VideoPlayerProps) {
+    const player = useVideoPlayer({ url, onEnded, autoplay, nextEpisodeUrl, initialSeekTime, onTimeUpdate, onGiveUp, onFirstFrame, onStartupSlow });
     const {
         videoRef, containerRef, isPlaying, isLoading, isBuffering, isHovering,
         handleMouseMove, handleTouchStart, handleTouchMove,

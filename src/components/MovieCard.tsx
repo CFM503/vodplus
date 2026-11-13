@@ -9,13 +9,26 @@ import { useState, useRef, useCallback } from 'react';
 import { CONFIG } from '@/config/config';
 import Link from 'next/link';
 import { parseVodPlayUrl } from '@/lib/vodParser';
+import { prefetchHlsStream } from '@/lib/hls-prefetch';
+import { RESOURCE_SITES } from '@/lib/resources';
+import { getNetworkSnapshot } from '@/lib/network-monitor';
 
 export function MovieCard({ movie, className, index = 999, latency: latencyProp }: { movie: Movie; className?: string; index?: number; latency?: number }) {
     const [imgSrc, setImgSrc] = useState<string>(movie?.vod_pic ?? '');
     const hasPrefetchedRef = useRef(false);
     // Stable refs for movie identity — avoids recreating handlePrefetch on list re-renders
-    const movieIdRef = useRef({ source_id: movie?.source_id, vod_id: movie?.vod_id, isDiscoverySrc: movie?.source_id === 'tmdb' });
-    movieIdRef.current = { source_id: movie?.source_id, vod_id: movie?.vod_id, isDiscoverySrc: movie?.source_id === 'tmdb' };
+    const movieIdRef = useRef({
+        source_id: movie?.source_id,
+        vod_id: movie?.vod_id,
+        vod_name: movie?.vod_name,
+        isDiscoverySrc: movie?.source_id === 'tmdb',
+    });
+    movieIdRef.current = {
+        source_id: movie?.source_id,
+        vod_id: movie?.vod_id,
+        vod_name: movie?.vod_name,
+        isDiscoverySrc: movie?.source_id === 'tmdb',
+    };
 
     const isDiscoverySrc = movie?.source_id === 'tmdb';
     const safeHref = movie?.source_id && movie?.vod_id
@@ -23,30 +36,42 @@ export function MovieCard({ movie, className, index = 999, latency: latencyProp 
         : `/search?q=${encodeURIComponent(movie?.vod_name ?? '')}`;
 
     const handlePrefetch = useCallback(() => {
-        const { source_id, vod_id, isDiscoverySrc: isDisc } = movieIdRef.current;
+        const { source_id, vod_id, vod_name, isDiscoverySrc: isDisc } = movieIdRef.current;
         if (hasPrefetchedRef.current || !source_id || !vod_id) return;
         hasPrefetchedRef.current = true;
 
-        // Preload hls.js module in browser cache ahead of navigation
+        // 并行预加载播放器组件与 hls.js 分包，缩短跳转后的冷启动瀑布
         import('hls.js').catch(() => { });
+        import('@/components/VideoPlayer').catch(() => { });
 
-        if (isDisc) return;
+        const snap = getNetworkSnapshot();
+        if (snap.saveData) return;
 
-        fetch(`/api/vod/detail?source=${encodeURIComponent(source_id)}&id=${encodeURIComponent(vod_id)}`, {
+        const detailUrl = isDisc
+            ? `/api/vod/detail?source=tmdb&id=${encodeURIComponent(vod_id)}${vod_name ? `&name=${encodeURIComponent(vod_name)}` : ''}`
+            : `/api/vod/detail?source=${encodeURIComponent(source_id)}&id=${encodeURIComponent(vod_id)}`;
+
+        fetch(detailUrl, {
             priority: 'low',
             cache: 'force-cache'
         })
-            .then(res => res.json())
+            .then(res => (res.ok ? res.json() : null))
             .then(data => {
-                if (data && data.data && data.data.vod_play_url) {
-                    const episodes = parseVodPlayUrl(data.data.vod_play_url);
+                if (data?.data?.vod_play_url) {
+                    const resolvedSourceId = data.data.source_id || source_id;
+                    const baseUrl = RESOURCE_SITES.find(s => s.id === resolvedSourceId)?.baseUrl;
+                    const episodes = parseVodPlayUrl(data.data.vod_play_url, baseUrl);
                     if (episodes.length > 0 && episodes[0].url) {
-                        fetch(episodes[0].url, { priority: 'low', mode: 'no-cors' }).catch(() => { });
+                        prefetchHlsStream(episodes[0].url, {
+                            priority: 'low',
+                            prefetchSegments: 1,
+                            skipIfSaveData: true,
+                        }).catch(() => { });
                     }
                 }
             })
             .catch(() => { });
-    }, [movie?.source_id, movie?.vod_id, isDiscoverySrc]);
+    }, []);
 
     // 早退放在所有 Hook 之后：movie 由列表项变为 undefined 时避免 Hook 数量变化导致崩溃
     if (!movie) return null;

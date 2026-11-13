@@ -97,6 +97,10 @@ export const CONFIG = {
     BUFFER_HIGH_BW: 45,
     // HLS 分片拉取最大重试超时 (毫秒，8000ms 快速超时并退避重试，防范卡死)
     HLS_FRAGMENT_TRY_TIMEOUT: 8000,
+    // 首字节 (TTFB) 超时 (毫秒)：用于快速淘汰无响应 CDN
+    HLS_TTFB_TIMEOUT: 6000,
+    // 单个分片总下载时长上限 (毫秒)：允许弱网但持续传输的分片完整下载，避免下载到 80% 被强行中断
+    HLS_FRAG_MAX_LOAD_TIME: 45000,
 
     // HLS 清单/层级加载超时时间 (毫秒)
     HLS_TIMEOUT: 5000,
